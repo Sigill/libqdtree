@@ -9,6 +9,9 @@
 
 #include "utils.hxx"
 
+namespace qdtree
+{
+
 template <typename T, typename U>
 struct BraketAccessor
 {
@@ -121,5 +124,7 @@ public:
 
 template <size_t D, typename T, typename A>
 std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree);
+
+} // namespace qdtree
 
 #endif // QDTREE_DEF_HXX

@@ -11,6 +11,14 @@
 #include "utils.hxx"
 #include "qdtree_def.hxx"
 
+namespace qdtree
+{
+
+// It is mandatory to instruct the compiler to search for operator<< in the
+// global namespace, otherwise it will only look for one in ::qdtree and
+// won't find the one associated to QDTree::value_type (user-defined).
+using ::operator<<;
+
 #ifdef HAS_INSTR
 #define LOG(x) std::cout << x
 
@@ -403,9 +411,13 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
 #endif
 
 #define IMPLEMENT_QDTREE(dimension, type) \
+namespace qdtree { \
   template \
   std::ostream& operator<<(std::ostream& out, const QDTree<dimension, type>& tree); \
   template \
-  class QDTree<dimension, type>
+  class QDTree<dimension, type>; \
+}
+
+} // namespace qdtree
 
 #endif // QDTREE_HXX

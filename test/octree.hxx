@@ -9,6 +9,6 @@ using Point = std::array<double, 3>;
 
 std::ostream& operator<<(std::ostream& out, const Point& p);
 
-using Tree = QDTree<3, Point>;
+using Tree = qdtree::QDTree<3, Point>;
 
 #endif // OCTREE_HXX

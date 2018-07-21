@@ -7,6 +7,9 @@
 
 #include "infix_iterator.hxx"
 
+namespace qdtree
+{
+
 template<typename T>
 print_coords_manip<T> print_coords(const std::initializer_list<T>& a)
 {
@@ -24,9 +27,11 @@ std::ostream& operator<<(std::ostream& out, const print_coords_manip<T>& m)
 
 
 #define IMPLEMENT_COORDS_MANIP(type) \
-template struct print_coords_manip<type>; \
-template print_coords_manip<type> print_coords<type>(const std::initializer_list<type>& a); \
-template std::ostream& operator<<(std::ostream& out, const print_coords_manip<type>& m)
+namespace qdtree { \
+  template struct print_coords_manip<type>; \
+  template print_coords_manip<type> print_coords<type>(const std::initializer_list<type>& a); \
+  template std::ostream& operator<<(std::ostream& out, const print_coords_manip<type>& m); \
+}
 
 
 
@@ -38,8 +43,11 @@ std::ostream& operator<<(std::ostream& out, const print_extent_manip<T>& m)
 
 
 #define IMPLEMENT_EXTENT_MANIP(type) \
-template struct print_extent_manip<type>; \
-template std::ostream& operator<<(std::ostream& out, const print_extent_manip<type>& m)
+namespace qdtree { \
+  template struct print_extent_manip<type>; \
+  template std::ostream& operator<<(std::ostream& out, const print_extent_manip<type>& m); \
+}
 
+} // namespace qdtree
 
 #endif // QDTREE_UTILS_HXX

@@ -5,6 +5,9 @@
 #include <vector>
 #include <ostream>
 
+namespace qdtree
+{
+
 template<typename T>
 struct print_coords_manip
 {
@@ -60,5 +63,7 @@ struct indent {
 };
 
 std::ostream& operator<<(std::ostream& out, const indent& i);
+
+} // namespace qdtree
 
 #endif // QDTREE_UTILS_DEF_HXX
