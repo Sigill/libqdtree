@@ -44,6 +44,14 @@ public:
       return false;
     }
 
+    for(const auto& p: matchers) {
+      size_t i = p.first;
+      if (i < 0 || i >= (1 << Tree::dimension)) {
+        *l << "/Child #" << i << " is invalid (" << i << " is out of range)";
+        return false;
+      }
+    }
+
     for(size_t i = 0; i < Tree::dimension; ++i) {
       auto matcher = matchers.find(i);
 
@@ -69,15 +77,11 @@ public:
       *os << " with no children";
     } else {
       *os << " where";
-      for(size_t i = 0; i < Tree::dimension; ++i) {
-        auto matcher = matchers.find(i);
-
-        if (matcher != matchers.cend()) {
-          *os << "\nChild #" << i << " ";
-          std::ostringstream ss;
-          matcher->second.DescribeTo(&ss);
-          *os << std::regex_replace(ss.str(), std::regex("\n"), "\n ");
-        }
+      for(const auto& p : matchers) {
+        *os << "\nChild #" << p.first << " ";
+        std::ostringstream ss;
+        p.second.DescribeTo(&ss);
+        *os << std::regex_replace(ss.str(), std::regex("\n"), "\n ");
       }
 
       if (matchers.size() != Tree::dimension) {
