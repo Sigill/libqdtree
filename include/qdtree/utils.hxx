@@ -1,11 +1,11 @@
 #ifndef QDTREE_UTILS_HXX
 #define QDTREE_UTILS_HXX
 
-#include "utils_def.hxx"
+#include "qdtree/utils_def.hxx"
 
 #include <algorithm>
 
-#include "infix_iterator.hxx"
+#include "qdtree/infix_iterator.hxx"
 
 namespace qdtree
 {

@@ -7,7 +7,7 @@
 #include <iosfwd>
 #include <utility>
 
-#include "utils.hxx"
+#include "qdtree/utils.hxx"
 
 namespace qdtree
 {

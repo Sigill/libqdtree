@@ -11,9 +11,9 @@ find_package(GMock REQUIRED)
 
 enable_testing()
 
-add_library(qdtree utils.cxx)
+add_library(qdtree src/utils.cxx)
 target_include_directories(qdtree
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(unit-tests
   test/octree.cxx

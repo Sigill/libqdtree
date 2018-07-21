@@ -1,4 +1,4 @@
-#include "utils.hxx"
+#include "qdtree/utils.hxx"
 
 namespace qdtree
 {

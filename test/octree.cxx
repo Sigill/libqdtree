@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "octree.hxx"
-#include "qdtree.hxx"
+#include "qdtree/qdtree.hxx"
 
 std::ostream& operator<<(std::ostream& out, const Point& p) {
   return out << qdtree::print_coords(p);

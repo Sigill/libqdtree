@@ -6,10 +6,10 @@
 #include <cmath>
 #include <tuple>
 
-#include "infix_iterator.hxx"
+#include "qdtree/infix_iterator.hxx"
 
-#include "utils.hxx"
-#include "qdtree_def.hxx"
+#include "qdtree/utils.hxx"
+#include "qdtree/qdtree_def.hxx"
 
 namespace qdtree
 {
