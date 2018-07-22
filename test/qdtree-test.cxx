@@ -56,13 +56,13 @@ public:
       auto matcher = matchers.find(i);
 
       if (matcher == matchers.cend()) {
-        if (n->at(i) != nullptr) {
+        if (n->child(i) != nullptr) {
           *l << "/Child #" << i << " is not NULL";
           return false;
         }
       } else {
         StringMatchResultListener ss;
-        if (!ExplainMatchResult(matcher->second, n->at(i), &ss)) {
+        if (!ExplainMatchResult(matcher->second, n->child(i), &ss)) {
           *l << "/Child #" << i << " " << ss.str();
           return false;
         }
@@ -113,7 +113,7 @@ class NoChildrenMatcher : public MatcherInterface<const Tree::node_type*> {
     }
 
     for(size_t i = 0; i < Tree::dimension; ++i) {
-      if (n->at(i) != nullptr) {
+      if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;
       }
@@ -148,7 +148,7 @@ class PointsMatcher : public MatcherInterface<const Tree::node_type*> {
     }
 
     for(size_t i = 0; i < Tree::dimension; ++i) {
-      if (n->at(i) != nullptr) {
+      if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;
       }
@@ -175,6 +175,10 @@ private:
 
 Matcher<const Tree::node_type*> PointsAre(::std::initializer_list<Tree::value_type> values) {
   return MakeMatcher(new PointsMatcher(ElementsAreArray(values)));
+}
+
+Matcher<const Tree::node_type*> PointsAre(const Tree::value_type& value) {
+  return MakeMatcher(new PointsMatcher(ElementsAre(value)));
 }
 
 Matcher<const Tree::node_type*> PointsAre(const Matcher<const Tree::node_type::value_list_type&>& matcher) {
@@ -217,7 +221,7 @@ TEST(QDTree, cover_wrap)
   // Extent will be initialized to floor/floor+1.
   t.add({0.0, 0.0});
   EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
-  EXPECT_THAT(t, Root(PointsAre({{0.0, 0.0}})));
+  EXPECT_THAT(t, Root(PointsAre({0.0, 0.0})));
 
   // Extent will be doubled 3x.
   // In +x since 6 is >= to the center of the current x extent.
@@ -235,7 +239,7 @@ TEST(QDTree, cover_wrap)
                                       {2, ChildrenMatch({
                                          {2, ChildrenMatch({
                                             {2, ChildrenMatch({
-                                               {0, PointsAre({{0.0, 0.0}})}})
+                                               {0, PointsAre({0.0, 0.0})}})
                                             }})
                                          }})
                                       }})));
@@ -261,8 +265,8 @@ TEST(QDTree, add)
   // +---+---+ 0
   // 0       1
   EXPECT_THAT(t, Root(ChildrenMatch({
-                                      {0, PointsAre({{0.0, 0.0}})},
-                                      {1, PointsAre({{1.0, 0.0}})}}
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
                                     )));
 
   t.add({0.5, 0.0});
@@ -302,10 +306,83 @@ TEST(QDTree, add)
   // +---------+----+----+ 0
   // 0        .5         1
   EXPECT_THAT(t, Root(ChildrenMatch({
-                                      {0, PointsAre({{0.0, 0.0}})},
+                                      {0, PointsAre({0.0, 0.0})},
                                       {1, ChildrenMatch({
-                                         {0, PointsAre({{0.5, 0.0}})},
-                                         {1, PointsAre({{1.0, 0.0}})}}
+                                         {0, PointsAre({0.5, 0.0})},
+                                         {1, PointsAre({1.0, 0.0})}}
                                        )}}
                                     )));
+}
+
+TEST(QDTree, remove)
+{
+  Tree t;
+
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  t.add({0.5, 0.0});
+  // +---------+---------+ 1
+  // |         |         |
+  // +         +         +
+  // |         |         |
+  // +---------+----+----+ .5
+  // |         |    |    |
+  // |   0;0   +----+----+
+  // |         |.5;0| 1;0|
+  // +---------+----+----+ 0
+  // 0        .5         1
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({0.5, 0.0})},
+                                         {1, PointsAre({1.0, 0.0})}}
+                                       )}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({2.0, 0.0}); // Non existing point.
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({0.5, 0.0})},
+                                         {1, PointsAre({1.0, 0.0})}}
+                                       )}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+
+  t.remove({1.0, 0.0});
+  // Nodes will have collapsed.
+  // +---------+---------+ 1
+  // |         |         |
+  // +         +         +
+  // |         |         |
+  // +---------+----+----+ .5
+  // |         |         |
+  // |   0;0   +  .5;0   +
+  // |         |         |
+  // +---------+----+----+ 0
+  // 0        .5         1
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({0.5, 0.0})}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+
+  t.remove({0.0, 0.0});
+  // Nodes will have collapsed.
+  // +---------+ 1
+  // |         |
+  // +  .5;0   +
+  // |         |
+  // +---------+ 0
+  // 0         1
+  EXPECT_THAT(t, Root(PointsAre({0.5, 0.0})));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+
+  t.remove({0.5, 0.0});
+  EXPECT_THAT(t, Root(IsNull()));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
 }

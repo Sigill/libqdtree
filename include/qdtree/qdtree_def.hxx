@@ -49,19 +49,31 @@ public:
 
   ~Node();
 
-  Node<D, T>* at(size_t i) const;
+  Node<D, T>* child(size_t i) const;
 
   bool leaf() const;
 
   const typename Node<D, T>::children_type& children() const;
 
+  bool has_siblings(size_t j) const;
+
   Node<D, T>* addChild(size_t i);
+
+  void removeChild(size_t i);
+
+  void truncate();
 
   void setChild(size_t i, Node<D, T>* child);
 
-  const std::list<typename Node<D, T>::value_type>& data() const;
+  Node<D, T>* firstChild();
 
-  void addData(const typename Node<D, T>::value_type& data);
+  Node<D, T>* lastChild();
+
+  const std::list<T>& data() const;
+
+  void addData(const T& data);
+
+  bool removeData(const T& data);
 
 protected:
   children_type mChildren;
@@ -120,6 +132,8 @@ public:
   void cover(const coord_type& p);
 
   void add(const T& data);
+
+  void remove(const T& data);
 };
 
 template <size_t D, typename T, typename A>

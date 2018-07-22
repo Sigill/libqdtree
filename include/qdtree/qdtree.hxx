@@ -30,7 +30,7 @@ void LOG_NODE_WRAPPED(const Node<D, T>* node,
 {
   std::cout << "Increasing extent toward index " << i << ": " << print_extent(a, b) << std::endl;
   if (node != nullptr) {
-    std::cout << "Wrapping " << node->at(i) << " as child " << i << " of " << node << std::endl;
+    std::cout << "Wrapping " << node->child(i) << " as child " << i << " of " << node << std::endl;
   }
 }
 #else
@@ -124,7 +124,7 @@ Node<D, T>::~Node() {
 }
 
 template <size_t D, typename T>
-Node<D, T>* Node<D, T>::at(size_t i) const {
+Node<D, T>* Node<D, T>::child(size_t i) const {
   return mChildren[i];
 }
 
@@ -141,8 +141,29 @@ const typename Node<D, T>::children_type& Node<D, T>::children() const {
 }
 
 template <size_t D, typename T>
+bool Node<D, T>::has_siblings(size_t j) const {
+  for (size_t i = 0; i < D; ++i) {
+    if(i != j && mChildren[i] != nullptr) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <size_t D, typename T>
 Node<D, T>* Node<D, T>::addChild(size_t i) {
   return mChildren[i] = new Node<D, T>;
+}
+
+template <size_t D, typename T>
+void Node<D, T>::removeChild(size_t i) {
+  delete mChildren[i];
+  mChildren[i] = nullptr;
+}
+
+template <size_t D, typename T>
+void Node<D, T>::truncate() {
+  mChildren.fill(nullptr);
 }
 
 template <size_t D, typename T>
@@ -151,15 +172,46 @@ void Node<D, T>::setChild(size_t i, Node<D, T>* child) {
 }
 
 template <size_t D, typename T>
-const std::list<typename Node<D, T>::value_type>& Node<D, T>::data() const {
+Node<D, T>* Node<D, T>::firstChild() {
+  for(Node<D, T>* child : mChildren) {
+    if (child != nullptr) {
+      return child;
+    }
+  }
+
+  return nullptr;
+}
+
+template <size_t D, typename T>
+Node<D, T>* Node<D, T>::lastChild() {
+  for(auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
+    if (*it) {
+      return *it;
+    }
+  }
+
+  return nullptr;
+}
+
+template <size_t D, typename T>
+const std::list<T> &Node<D, T>::data() const {
   return mData;
 }
 
 template <size_t D, typename T>
-void Node<D, T>::addData(const typename Node<D, T>::value_type& data) {
+void Node<D, T>::addData(const T &data) {
   mData.push_back(data);
 }
 
+template <size_t D, typename T>
+bool Node<D, T>::removeData(const T& data) {
+  auto it = std::find(mData.cbegin(), mData.cend(), data);
+  if (it != mData.cend()) {
+    mData.erase(it);
+    return true;
+  }
+  return false;
+}
 
 
 template <size_t D, typename T, typename A>
@@ -297,14 +349,14 @@ void QDTree<D, T, A>::add(const T& data) {
     i = data_index.to_ulong();
 
     parent = node;
-    node = node->at(data_index.to_ulong());
+    node = node->child(data_index.to_ulong());
 
     LOG(indent(level) << "Visiting [" << data_index.to_ulong() << "] " << print_extent(a, b) << " " << node << std::endl);
 
     if (node == nullptr) {
       parent->setChild(i, new node_type(data));
-      LOG(indent(level) << "Creating node " << parent->at(data_index.to_ulong()) << " as child " << data_index.to_ulong() << " of " << parent << "\n" <<
-          indent(level) << "Inserting " << data << " in " << parent->at(i) << std::endl);
+      LOG(indent(level) << "Creating node " << parent->child(data_index.to_ulong()) << " as child " << data_index.to_ulong() << " of " << parent << "\n" <<
+          indent(level) << "Inserting " << data << " in " << parent->child(i) << std::endl);
       return;
     }
   }
@@ -320,7 +372,7 @@ void QDTree<D, T, A>::add(const T& data) {
       mRoot->addData(data);
     } else {
       LOG(indent(level) << "Duplicating " << data << " in node " << i << std::endl);
-      parent->at(i)->addData(data);
+      parent->child(i)->addData(data);
     }
     return;
   }
@@ -338,7 +390,7 @@ void QDTree<D, T, A>::add(const T& data) {
       const node_type* oldParent = parent;
 #endif
       parent = parent->addChild(i);
-      LOG(indent(level) << "Creating node " << oldParent->at(i) << " as child " << i << " of " << oldParent << std::endl);
+      LOG(indent(level) << "Creating node " << oldParent->child(i) << " as child " << i << " of " << oldParent << std::endl);
     }
 
     compute_child_index(coord, a, b, data_index, m);
@@ -351,8 +403,107 @@ void QDTree<D, T, A>::add(const T& data) {
   parent->setChild(i, new node_type(data));
 
   LOG(indent(level) << "Moving " << node << " to child " << j << " of " << parent << "\n" <<
-      indent(level) << "Creating node " << parent->at(i) << " as child " << i << " of " << parent << "\n" <<
-      indent(level) << "Inserting " << data << " in " << parent->at(i) << std::endl);
+      indent(level) << "Creating node " << parent->child(i) << " as child " << i << " of " << parent << "\n" <<
+      indent(level) << "Inserting " << data << " in " << parent->child(i) << std::endl);
+}
+
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::remove(const T& data) {
+  node_type* parent = nullptr;
+  node_type* node = mRoot;
+  node_type* retainer = nullptr;
+
+  coord_type coord;
+  coordinates(data, coord);
+
+  coord_type a = mLb, b = mUb;
+  coord_type m;
+
+  LOG("# Removing " << data << std::endl);
+  LOG("Visiting [R] " << print_extent(a, b) << " " << node << std::endl);
+
+#ifdef HAS_INSTR
+  size_t level = 0;
+#endif
+
+  std::bitset<D> data_index;
+  size_t i, j;
+
+  // Find the leaf node for the point.
+  if (!node->leaf()) {
+    while(true) {
+      compute_child_index(coord, a, b, data_index, m);
+      i = data_index.to_ulong();
+
+      parent = node;
+      node = node->child(i);
+
+#ifdef HAS_INSTR
+      ++level;
+#endif
+      LOG(indent(level) << "Visiting [" << i << "] " <<
+          print_extent(a, b) << " " << node << std::endl);
+
+      if (node == nullptr) {
+        LOG(indent(level) << node << " is NULL" << std::endl);
+        return;
+      }
+
+      if (node->leaf()) {
+        break;
+      }
+
+      // Retain the deepest parent with a non-removed sibling.
+      if (parent->has_siblings(i)) {
+        retainer = parent;
+        j = i;
+        LOG(indent(level) << "Retaining node " << retainer << std::endl);
+      }
+    }
+  }
+
+  // Find the point to remove.
+  if (node->removeData(data)) {
+    LOG(indent(level) << "Removing " << data << " from " << node << std::endl);
+  } else {
+    LOG(indent(level) << node << " does not contain " << data << ", stop" << std::endl);
+    return;
+  }
+
+  // If there are other coincident points, we are done.
+  if (!node->data().empty()) {
+    LOG(indent(level) << node << " contains more data, stop" << std::endl);
+    return;
+  }
+
+  // If this is the root point, remove it.
+  if (parent == nullptr) {
+    LOG(indent(level) << "Root node is now empty, removing it" << std::endl);
+    delete mRoot;
+    mRoot = nullptr;
+    return;
+  }
+
+  // Remove this leaf.
+  LOG(indent(level) << "Deleting node " << parent->child(i) << std::endl);
+  parent->removeChild(i);
+
+  // If the parent now contains exactly one leaf, collapse superfluous parents.
+  node = parent->firstChild();
+  if (node != nullptr && node == parent->lastChild()) {
+    LOG(indent(level) << node << " is the only child of " << parent << ", ");
+    parent->truncate(); // Detach node from parent.
+
+    if (retainer == nullptr) {
+      LOG("collapsing everything, " << node << " is new root" << std::endl);
+      delete mRoot;
+      mRoot = node;
+    } else {
+      LOG("collapsing " << node << " into " << retainer << std::endl);
+      retainer->removeChild(j);
+      retainer->setChild(j, node);
+    }
+  }
 }
 
 template <size_t D, typename T, typename A>
