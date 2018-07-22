@@ -125,7 +125,7 @@ Node<D, T>::Node(size_t i, Node<D, T>* child)
 
 template <size_t D, typename T>
 Node<D, T>::~Node() {
-  for (size_t i = 0; i < D; ++i)
+  for (size_t i = 0; i < number_of_children; ++i)
     delete mChildren[i];
 }
 
@@ -542,7 +542,7 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
     if (node->leaf()) {
       out << " " << print_node_data(node);
     } else {
-      size_t index = (1 << D) - 1;
+      size_t index = QDTree<D, T, A>::node_type::number_of_children - 1;
       for(auto it = node->children().crbegin();
           it != node->children().crend();
           ++it, --index)

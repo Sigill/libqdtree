@@ -36,6 +36,8 @@ template <size_t D, typename T>
 class Node
 {
 public:
+  static constexpr size_t number_of_children = 1 << D;
+
   using value_type = T;
   using self = Node<D, T>;
   using children_type = std::array<self*, 1 << D>;
