@@ -20,7 +20,10 @@ namespace qdtree
 using ::operator<<;
 
 #ifdef HAS_INSTR
-#define LOG(x) std::cout << x
+#define LOG(x) std::cout << x << std::flush;
+#define LOGLN(x) LOG(x << "\n")
+#define ILOG(i, x) LOG(indent(i) << x)
+#define ILOGLN(i, x) LOGLN(indent(i) << x)
 
 template <size_t D, typename T, typename U>
 void LOG_NODE_WRAPPED(const Node<D, T>* node,
@@ -28,13 +31,16 @@ void LOG_NODE_WRAPPED(const Node<D, T>* node,
                       const std::array<U, D>& a,
                       const std::array<U, D>& b)
 {
-  std::cout << "Increasing extent toward index " << i << ": " << print_extent(a, b) << std::endl;
+  LOGLN("Increasing extent toward index " << i << ": " << print_extent(a, b));
   if (node != nullptr) {
-    std::cout << "Wrapping " << node->child(i) << " as child " << i << " of " << node << std::endl;
+    LOGLN("Wrapping " << node->child(i) << " as child " << i << " of " << node);
   }
 }
 #else
 #define LOG(x) (void)(0)
+#define LOGLN(x) LOG(x)
+#define ILOG(i, x) LOG(x)
+#define ILOGLN(i, x) LOG(x)
 
 #define LOG_NODE_WRAPPED(a, b, c, d) (void)(0)
 #endif
@@ -264,7 +270,7 @@ void QDTree<D, T, A>::cover(const typename QDTree<D, T, A>::coord_type& p)
 {
   coord_type a = mLb, b = mUb;
 
-  LOG("# Covering " << print_coords(p) << std::endl);
+  LOGLN("# Covering " << print_coords(p));
 
   if (a == b) {
     // The octree has no extent.
@@ -274,7 +280,7 @@ void QDTree<D, T, A>::cover(const typename QDTree<D, T, A>::coord_type& p)
       b[i] = a[i] + 1;
     }
 
-    LOG("Initializing extent " << print_extent(a, b) << std::endl);
+    LOGLN("Initializing extent " << print_extent(a, b));
   } else if (is_outside(p, a, b)) {
     // Extend needs to be increased. Double repeatedly to cover.
     node_type* node = mRoot;
@@ -315,13 +321,13 @@ void QDTree<D, T, A>::add(const T& data) {
 
   cover(coord);
 
-  LOG("# Adding " << data << std::endl);
+  LOGLN("# Adding " << data);
 
   // If the tree is empty, initialize the root as a leaf.
   if (mRoot == nullptr) {
     mRoot = new node_type(data);
-    LOG("Creating root node " << mRoot << "\n" <<
-        "Inserting " << data << " in " << mRoot << std::endl);
+    LOGLN("Creating root node " << mRoot);
+    LOGLN("Inserting " << data << " in " << mRoot);
     return;
   }
 
@@ -330,7 +336,7 @@ void QDTree<D, T, A>::add(const T& data) {
 
   coord_type a = mLb, b = mUb;
 
-  LOG("Visiting [R] " << print_extent(a, b) << " " << node << std::endl);
+  LOGLN("Visiting [R] " << print_extent(a, b) << " " << node);
 #ifdef HAS_INSTR
   size_t level = 0;
 #endif
@@ -351,12 +357,12 @@ void QDTree<D, T, A>::add(const T& data) {
     parent = node;
     node = node->child(data_index.to_ulong());
 
-    LOG(indent(level) << "Visiting [" << data_index.to_ulong() << "] " << print_extent(a, b) << " " << node << std::endl);
+    ILOGLN(level, "Visiting [" << data_index.to_ulong() << "] " << print_extent(a, b) << " " << node);
 
     if (node == nullptr) {
       parent->setChild(i, new node_type(data));
-      LOG(indent(level) << "Creating node " << parent->child(data_index.to_ulong()) << " as child " << data_index.to_ulong() << " of " << parent << "\n" <<
-          indent(level) << "Inserting " << data << " in " << parent->child(i) << std::endl);
+      ILOGLN(level, "Creating node " << parent->child(data_index.to_ulong()) << " as child " << data_index.to_ulong() << " of " << parent);
+      ILOGLN(level, "Inserting " << data << " in " << parent->child(i));
       return;
     }
   }
@@ -368,10 +374,10 @@ void QDTree<D, T, A>::add(const T& data) {
   if (maybe_coincident == coord) {
     // TODO replace both cases by node->push(d)?
     if (parent == nullptr) {
-      LOG(indent(level) << "Duplicating" << data << " in root node" << std::endl);
+      ILOGLN(level, "Duplicating" << data << " in root node");
       mRoot->addData(data);
     } else {
-      LOG(indent(level) << "Duplicating " << data << " in node " << i << std::endl);
+      ILOGLN(level, "Duplicating " << data << " in node " << i);
       parent->child(i)->addData(data);
     }
     return;
@@ -384,13 +390,13 @@ void QDTree<D, T, A>::add(const T& data) {
   do {
     if (parent == nullptr) {
       parent = mRoot = new node_type;
-      LOG("Parent is null, creating root node " << parent << std::endl);
+      LOGLN("Parent is null, creating root node " << parent);
     } else {
 #ifdef HAS_INSTR
       const node_type* oldParent = parent;
 #endif
       parent = parent->addChild(i);
-      LOG(indent(level) << "Creating node " << oldParent->child(i) << " as child " << i << " of " << oldParent << std::endl);
+      ILOGLN(level, "Creating node " << oldParent->child(i) << " as child " << i << " of " << oldParent);
     }
 
     compute_child_index(coord, a, b, data_index, m);
@@ -402,9 +408,9 @@ void QDTree<D, T, A>::add(const T& data) {
   parent->setChild(j, node);
   parent->setChild(i, new node_type(data));
 
-  LOG(indent(level) << "Moving " << node << " to child " << j << " of " << parent << "\n" <<
-      indent(level) << "Creating node " << parent->child(i) << " as child " << i << " of " << parent << "\n" <<
-      indent(level) << "Inserting " << data << " in " << parent->child(i) << std::endl);
+  ILOGLN(level, "Moving " << node << " to child " << j << " of " << parent);
+  ILOGLN(level, "Creating node " << parent->child(i) << " as child " << i << " of " << parent);
+  ILOGLN(level, "Inserting " << data << " in " << parent->child(i));
 }
 
 template <size_t D, typename T, typename A>
@@ -419,8 +425,8 @@ void QDTree<D, T, A>::remove(const T& data) {
   coord_type a = mLb, b = mUb;
   coord_type m;
 
-  LOG("# Removing " << data << std::endl);
-  LOG("Visiting [R] " << print_extent(a, b) << " " << node << std::endl);
+  LOGLN("# Removing " << data);
+  LOGLN("Visiting [R] " << print_extent(a, b) << " " << node);
 
 #ifdef HAS_INSTR
   size_t level = 0;
@@ -441,11 +447,10 @@ void QDTree<D, T, A>::remove(const T& data) {
 #ifdef HAS_INSTR
       ++level;
 #endif
-      LOG(indent(level) << "Visiting [" << i << "] " <<
-          print_extent(a, b) << " " << node << std::endl);
+      ILOGLN(level, "Visiting [" << i << "] " << print_extent(a, b) << " " << node);
 
       if (node == nullptr) {
-        LOG(indent(level) << node << " is NULL" << std::endl);
+        LOGLN(indent(level) << node << " is NULL");
         return;
       }
 
@@ -457,49 +462,49 @@ void QDTree<D, T, A>::remove(const T& data) {
       if (parent->has_siblings(i)) {
         retainer = parent;
         j = i;
-        LOG(indent(level) << "Retaining node " << retainer << std::endl);
+        ILOGLN(level, "Retaining node " << retainer);
       }
     }
   }
 
   // Find the point to remove.
   if (node->removeData(data)) {
-    LOG(indent(level) << "Removing " << data << " from " << node << std::endl);
+    ILOGLN(level, "Removing " << data << " from " << node);
   } else {
-    LOG(indent(level) << node << " does not contain " << data << ", stop" << std::endl);
+    ILOGLN(level, node << " does not contain " << data << ", stop");
     return;
   }
 
   // If there are other coincident points, we are done.
   if (!node->data().empty()) {
-    LOG(indent(level) << node << " contains more data, stop" << std::endl);
+    ILOGLN(level,  node << " contains more data, stop");
     return;
   }
 
   // If this is the root point, remove it.
   if (parent == nullptr) {
-    LOG(indent(level) << "Root node is now empty, removing it" << std::endl);
+    ILOGLN(level, "Root node is now empty, removing it");
     delete mRoot;
     mRoot = nullptr;
     return;
   }
 
   // Remove this leaf.
-  LOG(indent(level) << "Deleting node " << parent->child(i) << std::endl);
+  ILOGLN(level, "Deleting node " << parent->child(i));
   parent->removeChild(i);
 
   // If the parent now contains exactly one leaf, collapse superfluous parents.
   node = parent->firstChild();
   if (node != nullptr && node == parent->lastChild()) {
-    LOG(indent(level) << node << " is the only child of " << parent << ", ");
+    ILOG(level, node << " is the only child of " << parent << ", ");
     parent->truncate(); // Detach node from parent.
 
     if (retainer == nullptr) {
-      LOG("collapsing everything, " << node << " is new root" << std::endl);
+      LOGLN("collapsing everything, " << node << " is new root");
       delete mRoot;
       mRoot = node;
     } else {
-      LOG("collapsing " << node << " into " << retainer << std::endl);
+      LOGLN("collapsing " << node << " into " << retainer);
       retainer->removeChild(j);
       retainer->setChild(j, node);
     }
@@ -557,6 +562,9 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
 }
 
 #undef LOG
+#undef LOGLN
+#undef ILOG
+#undef ILOGLN
 #ifdef HAS_INSTR
 #undef LOG_NODE_WRAPPED
 #endif
