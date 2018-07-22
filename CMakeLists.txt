@@ -16,7 +16,7 @@ target_include_directories(qdtree
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(unit-tests
-  test/octree.cxx
+  test/quadtree.cxx
   test/qdtree-test.cxx)
 
 target_include_directories(unit-tests

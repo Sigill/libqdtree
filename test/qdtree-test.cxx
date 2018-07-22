@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
-#include "octree.hxx"
+#include "quadtree.hxx"
 
 #include <regex>
 
@@ -181,55 +181,131 @@ Matcher<const Tree::node_type*> PointsAre(const Matcher<const Tree::node_type::v
   return MakeMatcher(new PointsMatcher(matcher));
 }
 
-TEST(QDTree, cover)
-{
-  Tree::extent_type expected_extent;
+Tree::extent_type extent(const Tree::coord_type& lb,
+                         const Tree::coord_type& ub) {
+  return std::make_pair(lb, ub);
+}
 
+TEST(QDTree, cover_empty)
+{
   Tree t;
   EXPECT_THAT(t, Root(IsNull()));
-  expected_extent = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
-  EXPECT_EQ(t.extent(), expected_extent);
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {0.0, 0.0}));
 
-  t.cover({0.0, 0.0, 0.0});
+  // Initialized to floor/floor+1.
+  t.cover({0.0, 0.0});
   EXPECT_THAT(t, Root(IsNull()));
-  expected_extent = {{0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}};
-  EXPECT_EQ(t.extent(), expected_extent);
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
 
-  t.cover({2.0, 0.0, 0.0});
+  // Not outside, nothing to do.
+  t.cover({1.0, 0.0});
   EXPECT_THAT(t, Root(IsNull()));
-  expected_extent = {{0.0, -1.0, -1.0}, {2.0, 1.0, 1.0}};
-  EXPECT_EQ(t.extent(), expected_extent);
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
 
-  t.cover({0.0, 8.0, 0.0});
+  // Extent will be doubled 3x.
+  // In +x since 6 is >= to the center of the current x extent.
+  // In -y since 0 is <  to the center of the current y extent.
+  t.cover({6.0, -6.0});
   EXPECT_THAT(t, Root(IsNull()));
-  expected_extent = {{-14.0, -1.0, -1.0}, {2.0, 15.0, 15.0}};
-  EXPECT_EQ(t.extent(), expected_extent);
+  EXPECT_EQ(t.extent(), extent({0.0, -7.0}, {8.0, 1.0}));
+}
 
-  t.cover({0.0, -8.0, 0.0});
-  EXPECT_THAT(t, Root(IsNull()));
-  expected_extent = {{-14.0, -17.0, -17.0}, {18.0, 15.0, 15.0}};
-  EXPECT_EQ(t.extent(), expected_extent);
+TEST(QDTree, cover_wrap)
+{
+  Tree t;
+
+  // Extent will be initialized to floor/floor+1.
+  t.add({0.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(PointsAre({{0.0, 0.0}})));
+
+  // Extent will be doubled 3x.
+  // In +x since 6 is >= to the center of the current x extent.
+  // In -y since 0 is <  to the center of the current y extent.
+  // Original root node will therefore be wrapped 3x as child 2.
+  // +---+---+ y+
+  // | 2 | 3 |
+  // +---+---+ y
+  // | 0 | 1 |
+  // +---+---+ y-
+  // x-  x   x+
+  t.cover({6.0, -6.0});
+  EXPECT_EQ(t.extent(), extent({0.0, -7.0}, {8.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {2, ChildrenMatch({
+                                         {2, ChildrenMatch({
+                                            {2, ChildrenMatch({
+                                               {0, PointsAre({{0.0, 0.0}})}})
+                                            }})
+                                         }})
+                                      }})));
 }
 
 TEST(QDTree, add)
 {
   Tree t;
 
-  t.add({0.0, 0.0, 0.0});
-  EXPECT_THAT(t, Root(PointsAre({{0.0, 0.0, 0.0}})));
+  t.add({0.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(PointsAre({{0.0, 0.0}})));
 
-  t.add({1.0, 0.0, 0.0});
+  t.add({1.0, 0.0});
+  // Extent [0; 0], [1; 1] is big enough.
+  // Root node needs to be splitted. A new root node is created.
+  // Previous root node is moved as child 0 of the new root node.
+  // The new point is inserted in child 1 of the new root node.
+  // +---+---+ 1
+  // |   |   |
+  // +---+---+
+  // |0;0|1;0|
+  // +---+---+ 0
+  // 0       1
   EXPECT_THAT(t, Root(ChildrenMatch({
-                                      {0, PointsAre({{0.0, 0.0, 0.0}})},
-                                      {1, PointsAre({{1.0, 0.0, 0.0}})}
-                                    })));
+                                      {0, PointsAre({{0.0, 0.0}})},
+                                      {1, PointsAre({{1.0, 0.0}})}}
+                                    )));
 
-  t.add({2.0, 0.0, 0.0});
+  t.add({0.5, 0.0});
+  // Extent [0; 0], [1; 1] is big enough.
+  // +---+---+ 1
+  // | 2 | 3 |
+  // +---+---+
+  // | 0 | 1 |
+  // +---+---+ 0
+  // 0       1
+  // 0.5 is >= to the center of the x extent.
+  // 0 is < to the center of the y extent.
+  // The point will be considered for insertion in node 1.
+  // Node 1 is a leaf one, and its point is not equal to
+  // the one being inserted. It must be splitted.
+  // +---+---+ .5
+  // | 2 | 3 |
+  // +---+---+
+  // | 0 | 1 |
+  // +---+---+ 0
+  // .5      1
+  // 0.5 is < to the center of the x extent.
+  // 0 is < to the center of the y extent.
+  // (.5; 0) will be considered for insertion in node 0.
+  // 1 is >= to the center of the x extent.
+  // 0 is < to the center of the y extent.
+  // Previous node must be move to child 1.
+  // Both indexes are different, no more splitting needed.
+  // +---------+---------+ 1
+  // |         |         |
+  // +         +         +
+  // |         |         |
+  // +---------+----+----+ .5
+  // |         |    |    |
+  // |   0;0   +----+----+
+  // |         |.5;0| 1;0|
+  // +---------+----+----+ 0
+  // 0        .5         1
   EXPECT_THAT(t, Root(ChildrenMatch({
-                                      {6, ChildrenMatch({
-                                        {0, PointsAre({{0.0, 0.0, 0.0}})},
-                                        {1, PointsAre({{1.0, 0.0, 0.0}})}
-                                      })},
-                                      {7, PointsAre({{2.0, 0.0, 0.0}})}
-                                    })));
+                                      {0, PointsAre({{0.0, 0.0}})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({{0.5, 0.0}})},
+                                         {1, PointsAre({{1.0, 0.0}})}}
+                                       )}}
+                                    )));
 }
