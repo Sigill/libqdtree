@@ -52,43 +52,89 @@ U BraketAccessor<T, U>::operator()(const T& v, const size_t i) const
 }
 
 template<typename T, size_t D>
-void compute_child_extent(std::array<T, D>& lb,
-                          std::array<T, D>& ub,
-                          size_t child_index)
+std::array<T, D> middle(const std::array<T, D>& lb,
+                        const std::array<T, D>& ub)
 {
-  double w = (ub[0] - lb[0]) / 2;
-
+  std::array<T, D> m;
   for(size_t i = 0; i < D; ++i) {
-    if (child_index >> i & 1) {
-      lb[i] += w;
+    m[i] = (lb[i] + ub[i]) / 2.0;
+  }
+  return m;
+}
+
+template<typename T, size_t D>
+void compute_inner_extent(std::array<T, D>& lb,
+                          std::array<T, D>& ub,
+                          const std::array<T, D>& center,
+                          const size_t index)
+{
+  for(size_t i = 0; i < D; ++i) {
+    if (index >> i & 1) {
+      lb[i] = center[i];
     } else {
-      ub[i] -= w;
+      ub[i] = center[i];
     }
   }
 }
 
 template<typename T, size_t D>
-void compute_child_index(const std::array<T, D>& child_coords,
-                         std::array<T, D>& extent_lb,
-                         std::array<T, D>& extent_ub,
-                         std::bitset<D>& index,
-                         std::array<T, D>& middle)
+std::bitset<D> get_inner_position(const std::array<T, D>& point,
+                                     const std::array<T, D>& ref)
 {
-  index.reset();
+  std::bitset<D> position;
+  for(size_t i = 0; i < D; ++i) {
+    position.set(i, point[i] >= ref[i]);
+  }
+  return position;
+}
+
+template<typename T, size_t D>
+void get_inner_position(const std::array<T, D>& point,
+                        std::array<T, D>& lb,
+                        std::array<T, D>& ub,
+                        const std::array<T, D>& center,
+                        std::bitset<D>& position)
+{
+  position.reset();
 
   for(size_t i = 0; i < D; ++i) {
-    middle[i] = (extent_lb[i] + extent_ub[i]) / 2.0;
-    if (child_coords[i] >= middle[i]) {
-      index.set(i);
-      extent_lb[i] = middle[i];
+    if (point[i] >= center[i]) {
+      position.set(i);
+      lb[i] = center[i];
     } else {
-      extent_ub[i] = middle[i];
+      ub[i] = center[i];
     }
   }
 }
 
+template <typename T, size_t D>
+bool is_outside(const std::array<T, D>& c,
+                const std::array<T, D>& lb,
+                const std::array<T, D>& ub)
+{
+  bool x = false;
+  for(size_t i = 0; i < D; ++i) {
+    x = x || c[i] < lb[i] || c[i] > ub[i];
+  }
+  return x;
+}
+
+template <typename T, size_t D>
+bool is_outside(const std::array<T, D>& c_lb,
+                const std::array<T, D>& c_ub,
+                const std::array<T, D>& lb,
+                const std::array<T, D>& ub)
+{
+  bool x = false;
+  for(size_t i = 0; i < D; ++i) {
+    x = x || c_lb[i] > ub[i] || c_ub[i] < lb[i];
+  }
+  return x;
+}
+
 template <size_t D, typename T>
-print_node_data_manip<D, T>::print_node_data_manip(const Node<D, T>* node) : node(node) {}
+print_node_data_manip<D, T>::print_node_data_manip(const Node<D, T>* node)
+  : node(node) {}
 
 template <size_t D, typename T>
 print_node_data_manip<D, T> print_node_data(const Node<D, T>* node) {
@@ -235,6 +281,16 @@ QDTree<D, T, A>::~QDTree()
 }
 
 template <size_t D, typename T, typename A>
+typename QDTree<D, T, A>::coord_type
+QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in)
+{
+  QDTree<D, T, A>::coord_type out;
+  for(size_t i = 0; i < D; ++i)
+    out[i] = mCoordinateAccessor(in, i);
+  return out;
+}
+
+template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in,
                                   QDTree<D, T, A>::coord_type& out)
 {
@@ -249,20 +305,18 @@ const typename QDTree<D, T, A>::node_type* QDTree<D, T, A>::root() const
 }
 
 template <size_t D, typename T, typename A>
-typename QDTree<D, T, A>::extent_type QDTree<D, T, A>::extent() const {
-  return std::make_pair(mLb, mUb);
+const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::lowerBound() const {
+  return mLb;
 }
 
 template <size_t D, typename T, typename A>
-bool QDTree<D, T, A>::is_outside(const QDTree<D, T, A>::coord_type& p,
-                                 const QDTree<D, T, A>::coord_type& a,
-                                 const QDTree<D, T, A>::coord_type& b) const
-{
-  bool x = false;
-  for(size_t i = 0; i < D; ++i) {
-    x = x || p[i] < a[i] || p[i] > b[i];
-  }
-  return x;
+const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::upperBound() const {
+  return mUb;
+}
+
+template <size_t D, typename T, typename A>
+typename QDTree<D, T, A>::extent_type QDTree<D, T, A>::extent() const {
+  return std::make_pair(mLb, mUb);
 }
 
 template <size_t D, typename T, typename A>
@@ -316,8 +370,7 @@ void QDTree<D, T, A>::cover(const typename QDTree<D, T, A>::coord_type& p)
 
 template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::add(const T& data) {
-  coord_type coord;
-  coordinates(data, coord);
+  coord_type coord = coordinates(data);
 
   cover(coord);
 
@@ -343,7 +396,6 @@ void QDTree<D, T, A>::add(const T& data) {
 
   std::bitset<D> data_index;
   size_t i;
-  coord_type m;
 
   // Find the existing leaf for the new point, or add it.
   while (!node->leaf()) {
@@ -351,27 +403,26 @@ void QDTree<D, T, A>::add(const T& data) {
     ++level;
 #endif
 
-    compute_child_index(coord, a, b, data_index, m);
+    get_inner_position(coord, a, b, middle(a, b), data_index);
     i = data_index.to_ulong();
 
     parent = node;
-    node = node->child(data_index.to_ulong());
+    node = node->child(i);
 
-    ILOGLN(level, "Visiting [" << data_index.to_ulong() << "] " << print_extent(a, b) << " " << node);
+    ILOGLN(level, "Visiting [" << i << "] " << print_extent(a, b) << " " << node);
 
     if (node == nullptr) {
       parent->setChild(i, new node_type(data));
-      ILOGLN(level, "Creating node " << parent->child(data_index.to_ulong()) << " as child " << data_index.to_ulong() << " of " << parent);
+      ILOGLN(level, "Creating node " << parent->child(i) << " as child " << i << " of " << parent);
       ILOGLN(level, "Inserting " << data << " in " << parent->child(i));
       return;
     }
   }
 
-  coord_type maybe_coincident;
-  coordinates(node->data().front(), maybe_coincident);
+  coord_type other_coord = coordinates(node->data().front());
 
   // Is the new point exactly coincident with the existing point?
-  if (maybe_coincident == coord) {
+  if (other_coord == coord) {
     // TODO replace both cases by node->push(d)?
     if (parent == nullptr) {
       ILOGLN(level, "Duplicating" << data << " in root node");
@@ -383,8 +434,8 @@ void QDTree<D, T, A>::add(const T& data) {
     return;
   }
 
-  std::bitset<D> other_index;
   size_t j;
+  coord_type m;
 
   // Otherwise, split the leaf node until the old and new point are separated.
   do {
@@ -399,11 +450,11 @@ void QDTree<D, T, A>::add(const T& data) {
       ILOGLN(level, "Creating node " << oldParent->child(i) << " as child " << i << " of " << oldParent);
     }
 
-    compute_child_index(coord, a, b, data_index, m);
+    m = middle(a, b);
+    get_inner_position(coord, a, b, m, data_index);
 
-    for(size_t i = 0; i < D; ++i)
-      other_index.set(i, maybe_coincident[i] >= m[i]);
-  } while ((i = data_index.to_ulong()) == (j = other_index.to_ulong()));
+    j = get_inner_position(other_coord, m).to_ulong();
+  } while ((i = data_index.to_ulong()) == j);
 
   parent->setChild(j, node);
   parent->setChild(i, new node_type(data));
@@ -419,11 +470,9 @@ void QDTree<D, T, A>::remove(const T& data) {
   node_type* node = mRoot;
   node_type* retainer = nullptr;
 
-  coord_type coord;
-  coordinates(data, coord);
+  coord_type coord = coordinates(data);
 
   coord_type a = mLb, b = mUb;
-  coord_type m;
 
   LOGLN("# Removing " << data);
   LOGLN("Visiting [R] " << print_extent(a, b) << " " << node);
@@ -438,7 +487,7 @@ void QDTree<D, T, A>::remove(const T& data) {
   // Find the leaf node for the point.
   if (!node->leaf()) {
     while(true) {
-      compute_child_index(coord, a, b, data_index, m);
+      get_inner_position(coord, a, b, middle(a, b), data_index);
       i = data_index.to_ulong();
 
       parent = node;
@@ -517,19 +566,20 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
       const typename QDTree<D, T, A>::node_type*,
       size_t,                                     // node index, wrt parent
       size_t,                                     // depth, wrt root
-      typename QDTree<D, T, A>::extent_type       // Lower bound of the node
+      typename QDTree<D, T, A>::coord_type,       // Lower bound of the node
+      typename QDTree<D, T, A>::coord_type        // Upper bound of the node
       >> q;
 
   if (tree.root() != nullptr) {
-    q.push_front(std::make_tuple(tree.root(), 0, 0, tree.extent()));
+    q.push_front(std::make_tuple(tree.root(), 0, 0, tree.lowerBound(), tree.upperBound()));
   }
 
   const typename QDTree<D, T, A>::node_type* node;
   size_t node_index, level;
-  typename QDTree<D, T, A>::extent_type extent;
+  typename QDTree<D, T, A>::coord_type node_lb, node_ub;
 
   while(!q.empty()) {
-    std::tie(node, node_index, level, extent) = q.front();
+    std::tie(node, node_index, level, node_lb, node_ub) = q.front();
     q.pop_front();
 
     out << indent(level) << "[";
@@ -537,20 +587,23 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
       out << "R";
     else
       out << node_index;
-    out << "] " << print_extent(extent.first, extent.second) << " " << node;
+    out << "] " << print_extent(node_lb, node_ub) << " " << node;
 
     if (node->leaf()) {
       out << " " << print_node_data(node);
     } else {
+      typename QDTree<D, T, A>::coord_type child_lb, child_ub;
+      typename QDTree<D, T, A>::coord_type m = middle(node_lb, node_ub);
+
       size_t index = QDTree<D, T, A>::node_type::number_of_children - 1;
       for(auto it = node->children().crbegin();
           it != node->children().crend();
           ++it, --index)
       {
         if (*it != nullptr) {
-          typename QDTree<D, T, A>::extent_type child_extent(extent);
-          compute_child_extent(child_extent.first, child_extent.second, index);
-          q.push_front(std::make_tuple(*it, index, level + 1, child_extent));
+          child_lb = node_lb; child_ub = node_ub;
+          compute_inner_extent(child_lb, child_ub, m, index);
+          q.push_front(std::make_tuple(*it, index, level + 1, child_lb, child_ub));
         }
       }
     }
@@ -572,9 +625,11 @@ std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree) {
 #define IMPLEMENT_QDTREE(dimension, type) \
 namespace qdtree { \
   template \
-  std::ostream& operator<<(std::ostream& out, const QDTree<dimension, type>& tree); \
+  class Node<dimension, type>; \
   template \
   class QDTree<dimension, type>; \
+  template \
+  std::ostream& operator<<(std::ostream& out, const QDTree<dimension, type>& tree); \
 }
 
 } // namespace qdtree

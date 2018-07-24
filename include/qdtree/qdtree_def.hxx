@@ -20,18 +20,6 @@ struct BraketAccessor
   U operator()(const T& v, const size_t i) const;
 };
 
-template<typename T, size_t D>
-void compute_child_extent(std::array<T, D>& lb,
-                          std::array<T, D>& ub,
-                          size_t child_index);
-
-template<typename T, size_t D>
-void compute_child_index(const std::array<T, D>& child_coords,
-                         std::array<T, D>& extent_lb,
-                         std::array<T, D>& extent_ub,
-                         std::bitset<D>& index,
-                         std::array<T, D>& middle);
-
 template <size_t D, typename T>
 class Node
 {
@@ -123,13 +111,17 @@ public:
 
   ~QDTree();
 
+  coord_type coordinates(const value_type& in);
+
   void coordinates(const value_type& in, coord_type& out);
 
   const node_type* root() const;
 
-  extent_type extent() const;
+  const coord_type& lowerBound() const;
 
-  bool is_outside(const coord_type& p, const coord_type& a, const coord_type& b) const;
+  const coord_type& upperBound() const;
+
+  extent_type extent() const;
 
   void cover(const coord_type& p);
 
