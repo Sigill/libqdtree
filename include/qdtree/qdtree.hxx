@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <tuple>
+#include <vector>
 
 #include "qdtree/infix_iterator.hxx"
 
@@ -282,7 +283,7 @@ QDTree<D, T, A>::~QDTree()
 
 template <size_t D, typename T, typename A>
 typename QDTree<D, T, A>::coord_type
-QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in)
+QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in) const
 {
   QDTree<D, T, A>::coord_type out;
   for(size_t i = 0; i < D; ++i)
@@ -292,7 +293,7 @@ QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in)
 
 template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in,
-                                  QDTree<D, T, A>::coord_type& out)
+                                  QDTree<D, T, A>::coord_type& out) const
 {
   for(size_t i = 0; i < D; ++i)
     out[i] = mCoordinateAccessor(in, i);
@@ -558,6 +559,87 @@ void QDTree<D, T, A>::remove(const T& data) {
       retainer->setChild(j, node);
     }
   }
+}
+
+template <size_t D, typename T, typename A>
+const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
+                               double radius) const
+{
+  const T* needle = nullptr;
+  coord_type search_lb = lowerBound();
+  coord_type search_ub = upperBound();
+
+  std::vector<std::tuple<node_type*, coord_type, coord_type>> nodes;
+  if (mRoot != nullptr) {
+    nodes.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
+  }
+
+  if (std::isfinite(radius)) {
+    for(size_t i = 0; i < D; ++i) {
+      search_lb[i] = target[i] - radius;
+      search_ub[i] = target[i] + radius;
+    }
+    radius *= radius;
+  }
+
+  LOGLN("Search extent: " << print_extent(search_lb, search_ub));
+
+  node_type* node;
+  coord_type node_lb, node_ub, child_lb, child_ub, coord;
+  while(!nodes.empty()) {
+    const auto& it = nodes.back();
+    std::tie(node, node_lb, node_ub) = nodes.back();
+    nodes.pop_back();
+
+    LOGLN("Visiting " << node << ": " << print_extent(node_lb, node_ub));
+
+    if (node == nullptr)
+      continue;
+
+    // Stop searching if this node can't contain a closer data.
+    if (is_outside(node_lb, node_ub, search_lb, search_ub)) {
+      LOGLN(node << " is outside of " << print_extent(search_lb, search_ub));
+      continue;
+    }
+
+    if (node->data().empty()) { // Bisect the current node.
+      const coord_type m = middle(node_lb, node_ub);
+
+      size_t child_index = node_type::number_of_children - 1;
+      const auto end = node->children().crend();
+      for(auto it = node->children().crbegin(); it != end; ++it, --child_index)
+      {
+        child_lb = node_lb; child_ub = node_ub;
+        compute_inner_extent(child_lb, child_ub, m, child_index);
+        nodes.emplace_back(std::make_tuple(*it, child_lb, child_ub));
+      }
+
+      // Visit the closest octant first.
+      size_t closest = get_inner_position(target, m).to_ulong();
+      if (closest != 0)
+        std::swap(nodes.back(), nodes[nodes.size() - 1 - closest]);
+    } else { // Visit this point. (Visiting coincident points isn't necessary!)
+      coordinates(node->data().front(), coord);
+      double d2 = 0;
+      for(size_t i = 0; i < D; ++i) {
+        double d = coord[i] - target[i];
+        d2 += d*d;
+      }
+
+      if (d2 < radius) {
+        radius = d2;
+        double d = std::sqrt(d2);
+        for(size_t i = 0; i < D; ++i) {
+          search_lb[i] = target[i] - d;
+          search_ub[i] = target[i] + d;
+        }
+        LOGLN("Search extent updated: " << print_extent(search_lb, search_ub));
+        needle = &(node->data().front());
+      }
+    }
+  }
+
+  return needle;
 }
 
 template <size_t D, typename T, typename A>

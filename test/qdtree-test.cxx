@@ -3,6 +3,8 @@
 #include "quadtree.hxx"
 
 #include <regex>
+#include <chrono>
+#include <sstream>
 
 using namespace ::testing;
 
@@ -385,4 +387,110 @@ TEST(QDTree, remove)
   t.remove({0.5, 0.0});
   EXPECT_THAT(t, Root(IsNull()));
   EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+}
+
+TEST(QDTree, find)
+{
+  Tree t;
+  t.cover({0.0, 0.0});
+  t.cover({5.0, 5.0});
+
+  Tree::coord_type c;
+  for(size_t y = 0; y < 5; ++y) {
+    for(size_t x = 0; x < 5; ++x) {
+      t.add({(double)x, (double)y});
+    }
+  }
+
+  auto n = t.find({3.0, 3.0});
+  ASSERT_THAT(n, NotNull());
+  ASSERT_EQ(*n, Tree::coord_type({3.0, 3.0}));
+}
+
+using namespace std::chrono;
+
+template<typename TypeT = milliseconds>
+auto elapsed(steady_clock::time_point& begin) {
+  return duration_cast<TypeT>(steady_clock::now() - begin).count();
+}
+
+size_t from_env(const char* var, size_t def) {
+  if (const char* envvar = getenv(var)) {
+    std::stringstream in(envvar);
+    in >> def;
+    return def;
+  } else return def;
+}
+
+TEST(QDTree, find_vector_perf)
+{
+  size_t N = from_env("FIND_ITER", 50);
+
+  steady_clock::time_point begin = steady_clock::now();
+
+  std::vector<Tree::coord_type> v;
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      Tree::coord_type s = {(double)x, (double)y};
+      v.push_back(s);
+    }
+  }
+
+  auto build_time = elapsed(begin);
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      const Tree::coord_type* closest = nullptr;
+      double dist = std::numeric_limits<double>::max();
+
+      for(const auto& p : v) {
+        double d = (x - p[0]) * (x - p[0]) + (y - p[1]) * (y - p[1]);
+        if (d < dist) {
+          dist = d;
+          closest = &p;
+        }
+      }
+
+      if (closest == nullptr || (*closest)[0] != x || (*closest)[1] != y)
+        FAIL();
+    }
+  }
+
+  auto search_time = elapsed(begin);
+
+  std::cout << "Construction: " << build_time << " ms" << std::endl;
+  std::cout << "Search: " << search_time << " ms" << std::endl;
+}
+
+TEST(QDTree, find_perf)
+{
+  size_t N = from_env("FIND_ITER", 50);
+
+  steady_clock::time_point begin = steady_clock::now();
+
+  Tree t;
+  t.cover({0.0, 0.0});
+  t.cover({(double)N, (double)N});
+
+  Tree::coord_type c;
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      t.add({(double)x, (double)y});
+    }
+  }
+
+  auto build_time = elapsed(begin);
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      auto closest = t.find({(double)x, (double)y});
+      if (closest == nullptr || (*closest)[0] != x || (*closest)[1] != y)
+        FAIL();
+    }
+  }
+
+  auto search_time = elapsed(begin);
+
+  std::cout << "Construction: " << build_time << " ms" << std::endl;
+  std::cout << "Search: " << search_time << " ms" << std::endl;
 }

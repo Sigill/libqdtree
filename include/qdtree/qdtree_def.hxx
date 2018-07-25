@@ -6,6 +6,7 @@
 #include <bitset>
 #include <iosfwd>
 #include <utility>
+#include <limits>
 
 #include "qdtree/utils.hxx"
 
@@ -111,9 +112,9 @@ public:
 
   ~QDTree();
 
-  coord_type coordinates(const value_type& in);
+  coord_type coordinates(const value_type& in) const;
 
-  void coordinates(const value_type& in, coord_type& out);
+  void coordinates(const value_type& in, coord_type& out) const;
 
   const node_type* root() const;
 
@@ -128,6 +129,9 @@ public:
   void add(const T& data);
 
   void remove(const T& data);
+
+  const T* find(const coord_type& target,
+                double radius = std::numeric_limits<double>::infinity()) const;
 };
 
 template <size_t D, typename T, typename A>
