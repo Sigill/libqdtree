@@ -660,24 +660,22 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
 
 //  size_t visit_count = 0;
 
-  node_type* node;
-  coord_type node_lb, node_ub, child_lb, child_ub, coords;
+  typename Visitor::VisitedItem curr;
   while(!nodes.empty()) {
-    const auto& it = nodes.back();
-    std::tie(node, node_lb, node_ub) = nodes.back();
+    curr = std::move(nodes.back());
     nodes.pop_back();
 
-    if (node == nullptr)
+    if (curr.node == nullptr)
       continue;
 
 //    ++visit_count;
 
-    LOGLN("Visiting " << node << ": " << print_extent(node_lb, node_ub));
+    LOGLN("Visiting " << curr.node << ": " << print_extent(curr.lb, curr.ub));
 
-    if (!node->data().empty())
-      coordinates(node->data().front(), coords);
+    if (!curr.node->data().empty())
+      coordinates(curr.node->data().front(), curr.coords);
 
-    const typename Visitor::Queue& queue = visitor->visit(node, coords, node_lb, node_ub);
+    const typename Visitor::Queue& queue = visitor->visit(curr);
 
     if (!queue.empty())
     {
@@ -743,24 +741,21 @@ QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
 template <size_t D, typename T, typename A>
 const typename QDTree<D, T, A>::Visitor::Queue&
 QDTree<D, T, A>::ClosestPointVisitor::visit(
-    const typename QDTree<D, T, A>::node_type* node,
-    const typename QDTree<D, T, A>::coord_type& coords,
-    const typename QDTree<D, T, A>::coord_type& lb,
-    const typename QDTree<D, T, A>::coord_type& ub)
+    const typename QDTree<D, T, A>::Visitor::VisitedItem& it)
 {
   Visitor::mChildrenToVisit.clear();
 
   // Stop searching if this node can't contain a closer data.
-  if (is_outside(lb, ub, mSearchLb, mSearchUb)) {
+  if (is_outside(it.lb, it.ub, mSearchLb, mSearchUb)) {
     LOGLN(node << " is outside of " << print_extent(mSearchLb, mSearchUb));
     return Visitor::mChildrenToVisit;
   }
 
-  if (node->data().empty()) { // Bisect the current node.
-    Visitor::childrenToVisit(node, lb, ub);
+  if (it.node->data().empty()) { // Bisect the current node.
+    Visitor::childrenToVisit(it.node, it.lb, it.ub);
 
     // Visit the closest octant first.
-    size_t closest = get_inner_position(mTarget, middle(lb, ub)).to_ulong();
+    size_t closest = get_inner_position(mTarget, middle(it.lb, it.ub)).to_ulong();
     if (closest != 0)
       std::swap(Visitor::mChildrenToVisit.back(),
                 Visitor::mChildrenToVisit[Visitor::mChildrenToVisit.size() - 1 - closest]);
@@ -768,7 +763,7 @@ QDTree<D, T, A>::ClosestPointVisitor::visit(
 
     double d2 = 0;
     for(size_t i = 0; i < D; ++i) {
-      double d = coords[i] - mTarget[i];
+      double d = it.coords[i] - mTarget[i];
       d2 += d*d;
     }
 
@@ -780,7 +775,7 @@ QDTree<D, T, A>::ClosestPointVisitor::visit(
         mSearchUb[i] = mTarget[i] + d;
       }
       LOGLN("Search extent updated: " << print_extent(mSearchLb, mSearchUb));
-      mClosestPoint = &(node->data().front());
+      mClosestPoint = &(it.node->data().front());
     }
   }
 

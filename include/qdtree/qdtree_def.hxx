@@ -7,6 +7,7 @@
 #include <iosfwd>
 #include <utility>
 #include <limits>
+#include <tuple>
 
 #include "qdtree/utils.hxx"
 
@@ -114,14 +115,23 @@ public:
 
   class Visitor {
   public:
-    using Queue = std::vector<std::tuple<node_type*, coord_type, coord_type>>;
+    using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
+    using Queue = std::vector<QueueItem>;
+
+    struct VisitedItem {
+      node_type* node;
+      coord_type ub, lb, coords;
+
+      VisitedItem& operator=(QueueItem&& other) {
+        node = std::get<0>(other);
+        lb   = std::get<1>(other);
+        ub   = std::get<2>(other);
+      }
+    };
 
     Visitor();
 
-    virtual const Queue& visit(const node_type* node,
-                               const coord_type& coords,
-                               const coord_type& lb,
-                               const coord_type& ub) = 0;
+    virtual const Queue& visit(const struct VisitedItem& it) = 0;
 
   protected:
     void childrenToVisit(const node_type* node,
@@ -142,10 +152,7 @@ public:
                         double radius = std::numeric_limits<double>::max());
 
     const typename Visitor::Queue& visit(
-        const node_type* node,
-        const coord_type& coords,
-        const coord_type& lb,
-        const coord_type& ub) override;
+        const typename Visitor::VisitedItem& it) override;
 
     const T* getClosestPoint() const;
 
