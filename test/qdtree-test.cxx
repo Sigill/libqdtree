@@ -494,3 +494,58 @@ TEST(QDTree, find_perf)
   std::cout << "Construction: " << build_time << " ms" << std::endl;
   std::cout << "Search: " << search_time << " ms" << std::endl;
 }
+
+TEST(QDTree, find_visitor)
+{
+  Tree t;
+  t.cover({0.0, 0.0});
+  t.cover({5.0, 5.0});
+
+  for(size_t y = 0; y < 5; ++y) {
+    for(size_t x = 0; x < 5; ++x) {
+      t.add({(double)x, (double)y});
+    }
+  }
+
+  Tree::coord_type target = {3.0, 3.0};
+  Tree::ClosestPointVisitor visitor(target);
+  t.accept(&visitor);
+  auto closest = visitor.getClosestPoint();
+  ASSERT_THAT(closest, NotNull());
+  ASSERT_EQ(*closest, Tree::coord_type({3.0, 3.0}));
+}
+
+TEST(QDTree, find_visitor_perf)
+{
+  size_t N = from_env("FIND_ITER", 50);
+
+  steady_clock::time_point begin = steady_clock::now();
+
+  Tree t;
+  t.cover({0.0, 0.0});
+  t.cover({(double)N, (double)N});
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      t.add({(double)x, (double)y});
+    }
+  }
+
+  auto build_time = elapsed(begin);
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      Tree::coord_type target = {(double)x, (double)y};
+      Tree::ClosestPointVisitor visitor(target);
+      t.accept(&visitor);
+      auto closest = visitor.getClosestPoint();
+      if (closest == nullptr || (*closest)[0] != x || (*closest)[1] != y)
+        FAIL();
+    }
+  }
+
+  auto search_time = elapsed(begin);
+
+  std::cout << "Construction: " << build_time << " ms" << std::endl;
+  std::cout << "Search: " << search_time << " ms" << std::endl;
+}

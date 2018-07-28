@@ -13,6 +13,16 @@
 namespace qdtree
 {
 
+template <size_t D, typename T>
+class Node;
+
+template <size_t D,
+          typename T,
+          typename A>
+class QDtree;
+
+
+
 template <typename T, typename U>
 struct BraketAccessor
 {
@@ -102,6 +112,50 @@ public:
 
   static constexpr size_t dimension = D;
 
+  class Visitor {
+  public:
+    using Queue = std::vector<std::tuple<node_type*, coord_type, coord_type>>;
+
+    Visitor();
+
+    virtual const Queue& visit(const node_type* node,
+                               const coord_type& coords,
+                               const coord_type& lb,
+                               const coord_type& ub) = 0;
+
+  protected:
+    void childrenToVisit(const node_type* node,
+                         const coord_type& lb,
+                         const coord_type& ub);
+
+  private:
+    coord_type mChildLb, mChildUb;
+
+  protected:
+    Queue mChildrenToVisit;
+  };
+
+  class ClosestPointVisitor : public Visitor
+  {
+  public:
+    ClosestPointVisitor(const coord_type& target,
+                        double radius = std::numeric_limits<double>::max());
+
+    const typename Visitor::Queue& visit(
+        const node_type* node,
+        const coord_type& coords,
+        const coord_type& lb,
+        const coord_type& ub) override;
+
+    const T* getClosestPoint() const;
+
+  private:
+    const coord_type mTarget;
+    double mRadius;
+    coord_type mSearchLb, mSearchUb;
+    const T* mClosestPoint;
+  };
+
 protected:
   A mCoordinateAccessor;
   coord_type mLb, mUb;
@@ -132,6 +186,8 @@ public:
 
   const T* find(const coord_type& target,
                 double radius = std::numeric_limits<double>::infinity()) const;
+
+  void accept(Visitor* visitor) const;
 };
 
 template <size_t D, typename T, typename A>
