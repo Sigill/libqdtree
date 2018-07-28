@@ -20,7 +20,7 @@ add_executable(unit-tests
   test/qdtree-test.cxx)
 
 target_include_directories(unit-tests
-  PRIVATE {CMAKE_CURRENT_SOURCE_DIR}/test
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test
           ${GTEST_INCLUDE_DIRS}
           ${GMOCK_INCLUDE_DIRS})
 
