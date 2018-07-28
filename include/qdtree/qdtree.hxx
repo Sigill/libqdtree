@@ -570,6 +570,7 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
   coord_type search_ub = upperBound();
 
   std::vector<std::tuple<node_type*, coord_type, coord_type>> nodes;
+  nodes.reserve(node_type::number_of_children * 8);
   if (mRoot != nullptr) {
     nodes.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
   }
