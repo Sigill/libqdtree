@@ -660,7 +660,7 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
 
 //  size_t visit_count = 0;
 
-  typename Visitor::VisitedItem curr;
+  typename Visitor::VisitedItem curr(nodes);
   while(!nodes.empty()) {
     curr = std::move(nodes.back());
     nodes.pop_back();
@@ -675,14 +675,7 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
     if (!curr.node->data().empty())
       coordinates(curr.node->data().front(), curr.coords);
 
-    const typename Visitor::Queue& queue = visitor->visit(curr);
-
-    if (!queue.empty())
-    {
-      nodes.insert(nodes.end(),
-                   std::make_move_iterator(queue.cbegin()),
-                   std::make_move_iterator(queue.cend()));
-    }
+    visitor->visit(curr);
   }
 
 //  std::cout << visit_count << " nodes visited" << std::endl;
@@ -690,35 +683,16 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
 
 
 template <size_t D, typename T, typename A>
-QDTree<D, T, A>::Visitor::Visitor()
-{
-  mChildrenToVisit.reserve(node_type::number_of_children + 1);
-}
-
-template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::Visitor::childrenToVisit(
-    const node_type* node,
-    const coord_type& lb,
-    const coord_type& ub)
-{
-  const coord_type m = middle(lb, ub);
-
-  size_t child_index = node_type::number_of_children - 1;
-  const auto end = node->children().crend();
-  for(auto it = node->children().crbegin(); it != end; ++it, --child_index)
-  {
-    mChildLb = lb; mChildUb = ub;
-    compute_inner_extent(mChildLb, mChildUb, m, child_index);
-    mChildrenToVisit.emplace_back(*it, mChildLb, mChildUb);
-  }
-}
+QDTree<D, T, A>::Visitor::VisitedItem::VisitedItem(
+    typename QDTree<D, T, A>::Visitor::Queue& queue)
+  : queue(queue)
+{}
 
 template <size_t D, typename T, typename A>
 QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
     const typename QDTree<D, T, A>::coord_type& target,
     double radius)
-  : Visitor()
-  , mTarget(target)
+  : mTarget(target)
   , mRadius(radius)
   , mSearchLb()
   , mSearchUb()
@@ -739,28 +713,18 @@ QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
 }
 
 template <size_t D, typename T, typename A>
-const typename QDTree<D, T, A>::Visitor::Queue&
-QDTree<D, T, A>::ClosestPointVisitor::visit(
+void QDTree<D, T, A>::ClosestPointVisitor::visit(
     const typename QDTree<D, T, A>::Visitor::VisitedItem& it)
 {
-  Visitor::mChildrenToVisit.clear();
-
   // Stop searching if this node can't contain a closer data.
   if (is_outside(it.lb, it.ub, mSearchLb, mSearchUb)) {
     LOGLN(node << " is outside of " << print_extent(mSearchLb, mSearchUb));
-    return Visitor::mChildrenToVisit;
+    return;
   }
 
   if (it.node->data().empty()) { // Bisect the current node.
-    Visitor::childrenToVisit(it.node, it.lb, it.ub);
-
-    // Visit the closest octant first.
-    size_t closest = get_inner_position(mTarget, middle(it.lb, it.ub)).to_ulong();
-    if (closest != 0)
-      std::swap(Visitor::mChildrenToVisit.back(),
-                Visitor::mChildrenToVisit[Visitor::mChildrenToVisit.size() - 1 - closest]);
+    queueChildren(it);
   } else { // Visit this point. (Visiting coincident points isn't necessary!)
-
     double d2 = 0;
     for(size_t i = 0; i < D; ++i) {
       double d = it.coords[i] - mTarget[i];
@@ -779,7 +743,28 @@ QDTree<D, T, A>::ClosestPointVisitor::visit(
     }
   }
 
-  return Visitor::mChildrenToVisit;
+  return;
+}
+
+template <size_t D, typename T, typename A>
+void
+QDTree<D, T, A>::ClosestPointVisitor::queueChildren(const typename Visitor::VisitedItem& it)
+{
+  const coord_type m = middle(it.lb, it.ub);
+
+  size_t child_index = node_type::number_of_children - 1;
+  const auto end = it.node->children().crend();
+  for(auto child = it.node->children().crbegin(); child != end; ++child, --child_index)
+  {
+    mChildLb = it.lb; mChildUb = it.ub;
+    compute_inner_extent(mChildLb, mChildUb, m, child_index);
+    it.queue.emplace_back(*child, mChildLb, mChildUb);
+  }
+
+  // Visit the closest octant first.
+  size_t closest = get_inner_position(mTarget, m).to_ulong();
+  if (closest != 0)
+    std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
 }
 
 template <size_t D, typename T, typename A>

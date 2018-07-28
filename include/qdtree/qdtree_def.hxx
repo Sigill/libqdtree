@@ -119,8 +119,11 @@ public:
     using Queue = std::vector<QueueItem>;
 
     struct VisitedItem {
+      Queue& queue;
       node_type* node;
       coord_type ub, lb, coords;
+
+      VisitedItem(Queue& queue);
 
       VisitedItem& operator=(QueueItem&& other) {
         node = std::get<0>(other);
@@ -129,20 +132,7 @@ public:
       }
     };
 
-    Visitor();
-
-    virtual const Queue& visit(const struct VisitedItem& it) = 0;
-
-  protected:
-    void childrenToVisit(const node_type* node,
-                         const coord_type& lb,
-                         const coord_type& ub);
-
-  private:
-    coord_type mChildLb, mChildUb;
-
-  protected:
-    Queue mChildrenToVisit;
+    virtual void visit(const struct VisitedItem& it) = 0;
   };
 
   class ClosestPointVisitor : public Visitor
@@ -151,15 +141,17 @@ public:
     ClosestPointVisitor(const coord_type& target,
                         double radius = std::numeric_limits<double>::max());
 
-    const typename Visitor::Queue& visit(
-        const typename Visitor::VisitedItem& it) override;
+    void visit(const typename Visitor::VisitedItem& it) override;
 
     const T* getClosestPoint() const;
 
   private:
+    void queueChildren(const typename Visitor::VisitedItem& it);
+
+  private:
     const coord_type mTarget;
     double mRadius;
-    coord_type mSearchLb, mSearchUb;
+    coord_type mSearchLb, mSearchUb, mChildLb, mChildUb;
     const T* mClosestPoint;
   };
 
