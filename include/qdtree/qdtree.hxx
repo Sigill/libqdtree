@@ -652,30 +652,25 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
 template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::accept(Visitor *visitor) const
 {
-  typename Visitor::Queue nodes;
-  nodes.reserve(node_type::number_of_children * 8);
+  typename Visitor::Iterator iterator(node_type::number_of_children * 8);
   if (mRoot != nullptr) {
-    nodes.emplace_back(mRoot, lowerBound(), upperBound());
+    iterator.queue.emplace_back(mRoot, lowerBound(), upperBound());
   }
 
 //  size_t visit_count = 0;
 
-  typename Visitor::VisitedItem curr(nodes);
-  while(!nodes.empty()) {
-    curr = std::move(nodes.back());
-    nodes.pop_back();
-
-    if (curr.node == nullptr)
+  while(iterator.loadNext()) {
+    if (iterator.node == nullptr)
       continue;
 
 //    ++visit_count;
 
-    LOGLN("Visiting " << curr.node << ": " << print_extent(curr.lb, curr.ub));
+    LOGLN("Visiting " << iterator.node << ": " << print_extent(iterator.lb, iterator.ub));
 
-    if (!curr.node->data().empty())
-      coordinates(curr.node->data().front(), curr.coords);
+    if (!iterator.node->data().empty())
+      coordinates(iterator.node->data().front(), iterator.coords);
 
-    visitor->visit(curr);
+    visitor->visit(iterator);
   }
 
 //  std::cout << visit_count << " nodes visited" << std::endl;
@@ -683,10 +678,20 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
 
 
 template <size_t D, typename T, typename A>
-QDTree<D, T, A>::Visitor::VisitedItem::VisitedItem(
-    typename QDTree<D, T, A>::Visitor::Queue& queue)
-  : queue(queue)
-{}
+bool QDTree<D, T, A>::Visitor::Iterator::loadNext()
+{
+  if (queue.empty())
+    return false;
+
+  QueueItem& last = queue.back();
+  node = std::get<0>(last);
+  lb   = std::move(std::get<1>(last));
+  ub   = std::move(std::get<2>(last));
+
+  queue.pop_back();
+
+  return true;
+}
 
 template <size_t D, typename T, typename A>
 QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
@@ -714,7 +719,7 @@ QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
 
 template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::ClosestPointVisitor::visit(
-    const typename QDTree<D, T, A>::Visitor::VisitedItem& it)
+    typename QDTree<D, T, A>::Visitor::Iterator& it)
 {
   // Stop searching if this node can't contain a closer data.
   if (is_outside(it.lb, it.ub, mSearchLb, mSearchUb)) {
@@ -748,7 +753,7 @@ void QDTree<D, T, A>::ClosestPointVisitor::visit(
 
 template <size_t D, typename T, typename A>
 void
-QDTree<D, T, A>::ClosestPointVisitor::queueChildren(const typename Visitor::VisitedItem& it)
+QDTree<D, T, A>::ClosestPointVisitor::queueChildren(typename Visitor::Iterator& it)
 {
   const coord_type m = middle(it.lb, it.ub);
 
