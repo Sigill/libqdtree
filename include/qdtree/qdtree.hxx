@@ -756,9 +756,9 @@ QDTree<D, T, A>::ClosestPointVisitor::queueChildren(const typename Visitor::Visi
   const auto end = it.node->children().crend();
   for(auto child = it.node->children().crbegin(); child != end; ++child, --child_index)
   {
-    mChildLb = it.lb; mChildUb = it.ub;
-    compute_inner_extent(mChildLb, mChildUb, m, child_index);
-    it.queue.emplace_back(*child, mChildLb, mChildUb);
+    it.queue.emplace_back(*child, it.lb, it.ub);
+    auto& b = it.queue.back();
+    compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
   }
 
   // Visit the closest octant first.

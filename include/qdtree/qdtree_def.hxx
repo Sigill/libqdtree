@@ -151,7 +151,7 @@ public:
   private:
     const coord_type mTarget;
     double mRadius;
-    coord_type mSearchLb, mSearchUb, mChildLb, mChildUb;
+    coord_type mSearchLb, mSearchUb;
     const T* mClosestPoint;
   };
 
