@@ -53,7 +53,7 @@ U BraketAccessor<T, U>::operator()(const T& v, const size_t i) const
 }
 
 template<typename T, size_t D>
-std::array<T, D> middle(const std::array<T, D>& lb,
+inline std::array<T, D> middle(const std::array<T, D>& lb,
                         const std::array<T, D>& ub)
 {
   std::array<T, D> m;
@@ -64,7 +64,7 @@ std::array<T, D> middle(const std::array<T, D>& lb,
 }
 
 template<typename T, size_t D>
-void compute_inner_extent(std::array<T, D>& lb,
+inline void compute_inner_extent(std::array<T, D>& lb,
                           std::array<T, D>& ub,
                           const std::array<T, D>& center,
                           const size_t index)
@@ -79,7 +79,7 @@ void compute_inner_extent(std::array<T, D>& lb,
 }
 
 template<typename T, size_t D>
-std::bitset<D> get_inner_position(const std::array<T, D>& point,
+inline std::bitset<D> get_inner_position(const std::array<T, D>& point,
                                      const std::array<T, D>& ref)
 {
   std::bitset<D> position;
@@ -90,7 +90,7 @@ std::bitset<D> get_inner_position(const std::array<T, D>& point,
 }
 
 template<typename T, size_t D>
-void get_inner_position(const std::array<T, D>& point,
+inline void get_inner_position(const std::array<T, D>& point,
                         std::array<T, D>& lb,
                         std::array<T, D>& ub,
                         const std::array<T, D>& center,
@@ -109,7 +109,7 @@ void get_inner_position(const std::array<T, D>& point,
 }
 
 template <typename T, size_t D>
-bool is_outside(const std::array<T, D>& c,
+inline bool is_outside(const std::array<T, D>& c,
                 const std::array<T, D>& lb,
                 const std::array<T, D>& ub)
 {
@@ -121,7 +121,7 @@ bool is_outside(const std::array<T, D>& c,
 }
 
 template <typename T, size_t D>
-bool is_outside(const std::array<T, D>& c_lb,
+inline bool is_outside(const std::array<T, D>& c_lb,
                 const std::array<T, D>& c_ub,
                 const std::array<T, D>& lb,
                 const std::array<T, D>& ub)
@@ -247,7 +247,7 @@ Node<D, T>* Node<D, T>::lastChild() {
 }
 
 template <size_t D, typename T>
-const std::list<T> &Node<D, T>::data() const {
+inline const std::list<T> &Node<D, T>::data() const {
   return mData;
 }
 
@@ -282,7 +282,7 @@ QDTree<D, T, A>::~QDTree()
 }
 
 template <size_t D, typename T, typename A>
-typename QDTree<D, T, A>::coord_type
+inline typename QDTree<D, T, A>::coord_type
 QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in) const
 {
   QDTree<D, T, A>::coord_type out;
@@ -292,8 +292,8 @@ QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in) const
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in,
-                                  QDTree<D, T, A>::coord_type& out) const
+inline void QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in,
+                                         QDTree<D, T, A>::coord_type& out) const
 {
   for(size_t i = 0; i < D; ++i)
     out[i] = mCoordinateAccessor(in, i);
@@ -306,12 +306,12 @@ const typename QDTree<D, T, A>::node_type* QDTree<D, T, A>::root() const
 }
 
 template <size_t D, typename T, typename A>
-const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::lowerBound() const {
+inline const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::lowerBound() const {
   return mLb;
 }
 
 template <size_t D, typename T, typename A>
-const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::upperBound() const {
+inline const typename QDTree<D, T, A>::coord_type& QDTree<D, T, A>::upperBound() const {
   return mUb;
 }
 
