@@ -628,6 +628,10 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
         LOGLN("Search extent updated: " << print_extent(search_lb, search_ub));
         needle = &(it.node->data().front());
       }
+
+      // Cannot find a closer neighbor, skip the rest of the queue.
+      if (d2 <= 0)
+        it.queue.clear();
     }
   }
 
@@ -753,6 +757,10 @@ void NearestNeighborVisitor<D, T, C>::visit(
       LOGLN("Search extent updated: " << print_extent(mSearchLb, mSearchUb));
       mNearestNeighbor = &(it.node->data().front());
     }
+
+    // Cannot find a closer neighbor, skip the rest of the queue.
+    if (d2 <= 0)
+      it.queue.clear();
   }
 
   return;

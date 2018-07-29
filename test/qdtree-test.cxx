@@ -448,6 +448,9 @@ TEST(QDTree, find_vector_perf)
         if (d < dist) {
           dist = d;
           closest = &p;
+
+          if (dist <= 0)
+            break;
         }
       }
 
@@ -539,7 +542,7 @@ TEST(QDTree, find_visitor)
   TracedNearestNeighborVisitor<Tree::dimension, Tree::value_type, Tree::coord_value_type> visitor(target);
   t.accept(&visitor);
   auto closest = visitor.getNearestNeighbor();
-  EXPECT_EQ(visitor.numberOfVisitedNodes(), 13);
+  EXPECT_EQ(visitor.numberOfVisitedNodes(), 4);
   ASSERT_THAT(closest, NotNull());
   ASSERT_EQ(*closest, Tree::coord_type({3.0, 3.0}));
 }
