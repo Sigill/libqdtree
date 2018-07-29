@@ -472,7 +472,6 @@ TEST(QDTree, find_perf)
   t.cover({0.0, 0.0});
   t.cover({(double)N, (double)N});
 
-  Tree::coord_type c;
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
       t.add({(double)x, (double)y});
@@ -495,6 +494,35 @@ TEST(QDTree, find_perf)
   std::cout << "Search: " << search_time << " ms" << std::endl;
 }
 
+template <size_t D, typename T, typename C>
+class TracedNearestNeighborVisitor
+    : public qdtree::NearestNeighborVisitor<D, T, C>
+{
+public:
+  using Base = typename TracedNearestNeighborVisitor::NearestNeighborVisitor;
+  using typename Base::node_iterator;
+  using typename Base::coord_type;
+  using typename Base::coord_value_type;
+
+  TracedNearestNeighborVisitor(const coord_type& target,
+                               coord_value_type radius = std::numeric_limits<coord_value_type>::max())
+    : Base(target, radius)
+    , count(0)
+  {}
+
+  void visit(node_iterator& it) override {
+    ++count;
+    Base::visit(it);
+  }
+
+  size_t numberOfVisitedNodes() const {
+    return count;
+  }
+
+private:
+  size_t count;
+};
+
 TEST(QDTree, find_visitor)
 {
   Tree t;
@@ -508,9 +536,10 @@ TEST(QDTree, find_visitor)
   }
 
   Tree::coord_type target = {3.0, 3.0};
-  Tree::ClosestPointVisitor visitor(target);
+  TracedNearestNeighborVisitor<Tree::dimension, Tree::value_type, Tree::coord_value_type> visitor(target);
   t.accept(&visitor);
-  auto closest = visitor.getClosestPoint();
+  auto closest = visitor.getNearestNeighbor();
+  EXPECT_EQ(visitor.numberOfVisitedNodes(), 13);
   ASSERT_THAT(closest, NotNull());
   ASSERT_EQ(*closest, Tree::coord_type({3.0, 3.0}));
 }
@@ -536,9 +565,7 @@ TEST(QDTree, find_visitor_perf)
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
       Tree::coord_type target = {(double)x, (double)y};
-      Tree::ClosestPointVisitor visitor(target);
-      t.accept(&visitor);
-      auto closest = visitor.getClosestPoint();
+      auto closest = t.find_visitor(target);
       if (closest == nullptr || (*closest)[0] != x || (*closest)[1] != y)
         FAIL();
     }

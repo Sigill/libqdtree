@@ -189,7 +189,7 @@ bool Node<D, T>::leaf() const {
 }
 
 template <size_t D, typename T>
-const typename Node<D, T>::children_type& Node<D, T>::children() const {
+const typename Node<D, T>::child_list_type& Node<D, T>::children() const {
   return mChildren;
 }
 
@@ -563,16 +563,15 @@ void QDTree<D, T, A>::remove(const T& data) {
 
 template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
-                               double radius) const
+                               QDTree<D, T, A>::coord_value_type radius) const
 {
   const T* needle = nullptr;
   coord_type search_lb = lowerBound();
   coord_type search_ub = upperBound();
 
-  std::vector<std::tuple<node_type*, coord_type, coord_type>> nodes;
-  nodes.reserve(node_type::number_of_children * 8);
+  node_iterator it(node_type::number_of_children * 8);
   if (mRoot != nullptr) {
-    nodes.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
+    it.queue.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
   }
 
   if (std::isfinite(radius)) {
@@ -587,59 +586,47 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
 
   LOGLN("Search extent: " << print_extent(search_lb, search_ub));
 
-  node_type* node;
-  coord_type node_lb, node_ub, child_lb, child_ub, coord;
-  while(!nodes.empty()) {
-    const auto& it = nodes.back();
-    std::tie(node, node_lb, node_ub) = nodes.back();
-    nodes.pop_back();
+  while(it.loadNext()) {
+    LOGLN("Visiting " << it.node << ": " << print_extent(it.lb, it.ub));
 
-    LOGLN("Visiting " << node << ": " << print_extent(node_lb, node_ub));
-
-    if (node == nullptr)
+    if (it.node == nullptr)
       continue;
 
 //    ++visit_count;
 
     // Stop searching if this node can't contain a closer data.
-    if (is_outside(node_lb, node_ub, search_lb, search_ub)) {
-      LOGLN(node << " is outside of " << print_extent(search_lb, search_ub));
+    if (is_outside(it.lb, it.ub, search_lb, search_ub)) {
+      LOGLN(it.node << " is outside of " << print_extent(search_lb, search_ub));
       continue;
     }
 
-    if (node->data().empty()) { // Bisect the current node.
-      const coord_type m = middle(node_lb, node_ub);
-
-      size_t child_index = node_type::number_of_children - 1;
-      const auto end = node->children().crend();
-      for(auto it = node->children().crbegin(); it != end; ++it, --child_index)
-      {
-        child_lb = node_lb; child_ub = node_ub;
-        compute_inner_extent(child_lb, child_ub, m, child_index);
-        nodes.emplace_back(std::make_tuple(*it, child_lb, child_ub));
-      }
+    if (it.node->data().empty()) { // Bisect the current node.
+      it.queueChildren();
 
       // Visit the closest octant first.
-      size_t closest = get_inner_position(target, m).to_ulong();
+      size_t closest = get_inner_position(target, middle(it.lb, it.ub)).to_ulong();
       if (closest != 0)
-        std::swap(nodes.back(), nodes[nodes.size() - 1 - closest]);
+        std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
     } else { // Visit this point. (Visiting coincident points isn't necessary!)
-      coordinates(node->data().front(), coord);
-      double d2 = 0;
+      coordinates(it.node->data().front(), it.coords);
+
+      LOGLN("Visiting point: " << it.coords);
+
+      coord_value_type d2 = 0;
       for(size_t i = 0; i < D; ++i) {
-        double d = coord[i] - target[i];
+        coord_value_type d = it.coords[i] - target[i];
         d2 += d*d;
       }
 
       if (d2 < radius) {
         radius = d2;
-        double d = std::sqrt(d2);
+        coord_value_type d = std::sqrt(d2);
         for(size_t i = 0; i < D; ++i) {
           search_lb[i] = target[i] - d;
           search_ub[i] = target[i] + d;
         }
         LOGLN("Search extent updated: " << print_extent(search_lb, search_ub));
-        needle = &(node->data().front());
+        needle = &(it.node->data().front());
       }
     }
   }
@@ -650,9 +637,9 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::accept(Visitor *visitor) const
+void QDTree<D, T, A>::accept(QDTree<D, T, A>::visitor_type *visitor) const
 {
-  typename Visitor::Iterator iterator(node_type::number_of_children * 8);
+  node_iterator iterator(node_type::number_of_children * 8);
   if (mRoot != nullptr) {
     iterator.queue.emplace_back(mRoot, lowerBound(), upperBound());
   }
@@ -676,36 +663,49 @@ void QDTree<D, T, A>::accept(Visitor *visitor) const
 //  std::cout << visit_count << " nodes visited" << std::endl;
 }
 
-
 template <size_t D, typename T, typename A>
-bool QDTree<D, T, A>::Visitor::Iterator::loadNext()
+const T* QDTree<D, T, A>::find_visitor(const QDTree<D, T, A>::coord_type& target,
+                                       QDTree<D, T, A>::coord_value_type radius) const
 {
-  if (queue.empty())
-    return false;
-
-  QueueItem& last = queue.back();
-  node = std::get<0>(last);
-  lb   = std::move(std::get<1>(last));
-  ub   = std::move(std::get<2>(last));
-
-  queue.pop_back();
-
-  return true;
+  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  accept(&visitor);
+  return visitor.getNearestNeighbor();
 }
 
-template <size_t D, typename T, typename A>
-QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
-    const typename QDTree<D, T, A>::coord_type& target,
-    double radius)
+template <size_t D, typename T, typename C>
+inline void
+NodeIterator<D, T, C>::queueChildren()
+{
+  const coord_type m = middle(lb, ub);
+
+  size_t child_index = node_type::number_of_children - 1;
+  auto child = &(node->children().back());
+  while(true) {
+    queue.emplace_back(*child, lb, ub);
+    auto& b = queue.back();
+    compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
+
+    if (child_index == 0)
+      break;
+    --child_index;
+    --child;
+  }
+}
+
+
+template <size_t D, typename T, typename C>
+NearestNeighborVisitor<D, T, C>::NearestNeighborVisitor(
+    const NearestNeighborVisitor<D, T, C>::coord_type& target,
+    NearestNeighborVisitor<D, T, C>::coord_value_type radius)
   : mTarget(target)
   , mRadius(radius)
   , mSearchLb()
   , mSearchUb()
-  , mClosestPoint(nullptr)
+  , mNearestNeighbor(nullptr)
 {
   for(size_t i = 0; i < D; ++i) {
-    mSearchLb[i] = std::numeric_limits<double>::lowest();
-    mSearchUb[i] = std::numeric_limits<double>::max();
+    mSearchLb[i] = std::numeric_limits<coord_value_type>::lowest();
+    mSearchUb[i] = std::numeric_limits<coord_value_type>::max();
   }
 
   if (std::isfinite(mRadius)) {
@@ -717,65 +717,52 @@ QDTree<D, T, A>::ClosestPointVisitor::ClosestPointVisitor(
   }
 }
 
-template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::ClosestPointVisitor::visit(
-    typename QDTree<D, T, A>::Visitor::Iterator& it)
+template <size_t D, typename T, typename C>
+void NearestNeighborVisitor<D, T, C>::visit(
+    typename NearestNeighborVisitor<D, T, C>::node_iterator& it)
 {
   // Stop searching if this node can't contain a closer data.
   if (is_outside(it.lb, it.ub, mSearchLb, mSearchUb)) {
-    LOGLN(node << " is outside of " << print_extent(mSearchLb, mSearchUb));
+    LOGLN(it.node << " is outside of " << print_extent(mSearchLb, mSearchUb));
     return;
   }
 
   if (it.node->data().empty()) { // Bisect the current node.
-    queueChildren(it);
+    it.queueChildren();
+
+    // Visit the closest octant first.
+    size_t closest = get_inner_position(mTarget, middle(it.lb, it.ub)).to_ulong();
+    if (closest != 0)
+      std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
   } else { // Visit this point. (Visiting coincident points isn't necessary!)
-    double d2 = 0;
+    LOGLN("Visiting point: " << it.coords);
+
+    coord_value_type d2 = 0;
     for(size_t i = 0; i < D; ++i) {
-      double d = it.coords[i] - mTarget[i];
+      coord_value_type d = it.coords[i] - mTarget[i];
       d2 += d*d;
     }
 
     if (d2 < mRadius) {
       mRadius = d2;
-      double d = std::sqrt(d2);
+      coord_value_type d = std::sqrt(d2);
       for(size_t i = 0; i < D; ++i) {
         mSearchLb[i] = mTarget[i] - d;
         mSearchUb[i] = mTarget[i] + d;
       }
       LOGLN("Search extent updated: " << print_extent(mSearchLb, mSearchUb));
-      mClosestPoint = &(it.node->data().front());
+      mNearestNeighbor = &(it.node->data().front());
     }
   }
 
   return;
 }
 
-template <size_t D, typename T, typename A>
-void
-QDTree<D, T, A>::ClosestPointVisitor::queueChildren(typename Visitor::Iterator& it)
+template <size_t D, typename T, typename C>
+const typename NearestNeighborVisitor<D, T, C>::value_type*
+NearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
 {
-  const coord_type m = middle(it.lb, it.ub);
-
-  size_t child_index = node_type::number_of_children - 1;
-  const auto end = it.node->children().crend();
-  for(auto child = it.node->children().crbegin(); child != end; ++child, --child_index)
-  {
-    it.queue.emplace_back(*child, it.lb, it.ub);
-    auto& b = it.queue.back();
-    compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
-  }
-
-  // Visit the closest octant first.
-  size_t closest = get_inner_position(mTarget, m).to_ulong();
-  if (closest != 0)
-    std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
-}
-
-template <size_t D, typename T, typename A>
-const T* QDTree<D, T, A>::ClosestPointVisitor::getClosestPoint() const
-{
-  return mClosestPoint;
+  return mNearestNeighbor;
 }
 
 template <size_t D, typename T, typename A>

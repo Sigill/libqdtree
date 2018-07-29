@@ -39,46 +39,45 @@ public:
   static constexpr size_t number_of_children = 1 << D;
 
   using value_type = T;
-  using self = Node<D, T>;
-  using children_type = std::array<self*, 1 << D>;
+  using child_list_type = std::array<Node*, 1 << D>;
   using value_list_type = std::list<value_type>;
 
   Node();
 
   Node(const value_type& d);
 
-  Node(size_t i, Node<D, T>* child);
+  Node(size_t i, Node* child);
 
   ~Node();
 
-  Node<D, T>* child(size_t i) const;
+  Node* child(size_t i) const;
 
   bool leaf() const;
 
-  const typename Node<D, T>::children_type& children() const;
+  const child_list_type& children() const;
 
   bool has_siblings(size_t j) const;
 
-  Node<D, T>* addChild(size_t i);
+  Node* addChild(size_t i);
 
   void removeChild(size_t i);
 
   void truncate();
 
-  void setChild(size_t i, Node<D, T>* child);
+  void setChild(size_t i, Node* child);
 
-  Node<D, T>* firstChild();
+  Node* firstChild();
 
-  Node<D, T>* lastChild();
+  Node* lastChild();
 
-  const std::list<T>& data() const;
+  const value_list_type& data() const;
 
   void addData(const T& data);
 
   bool removeData(const T& data);
 
 protected:
-  children_type mChildren;
+  child_list_type mChildren;
   value_list_type mData;
 };
 
@@ -99,6 +98,75 @@ std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m
 
 
 
+template <size_t D, typename T, // Same as in Node<D, T>
+          typename C>           //
+class NodeIterator
+{
+public:
+  using node_type = Node<D, T>;
+  using coord_value_type = C;
+  using coord_type = std::array<C, D>;
+  using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
+  using Queue = std::vector<QueueItem>;
+
+  Queue queue;
+  node_type* node;
+  coord_type ub, lb, coords;
+
+  NodeIterator(size_t reserve) {
+    queue.reserve(reserve);
+  }
+
+  bool loadNext() {
+    if (queue.empty())
+      return false;
+
+    QueueItem& last = queue.back();
+    node = std::get<0>(last);
+    lb   = std::move(std::get<1>(last));
+    ub   = std::move(std::get<2>(last));
+
+    queue.pop_back();
+
+    return true;
+  }
+
+  void queueChildren();
+};
+
+template <size_t D, typename T, typename C>
+class Visitor {
+public:
+  using node_iterator = NodeIterator<D, T, C>;
+
+  virtual void visit(node_iterator& it) = 0;
+};
+
+template <size_t D, typename T, typename C>
+class NearestNeighborVisitor : public Visitor<D, T, C>
+{
+public:
+  using typename NearestNeighborVisitor::Visitor::node_iterator;
+  using node_type = typename node_iterator::node_type;
+  using value_type = typename node_iterator::node_type::value_type;
+  using coord_type = typename node_iterator::coord_type;
+  using coord_value_type = typename coord_type::value_type;
+
+  NearestNeighborVisitor(const coord_type& target,
+                         coord_value_type radius = std::numeric_limits<coord_value_type>::max());
+
+  void visit(node_iterator& it) override;
+
+  const value_type* getNearestNeighbor() const;
+
+private:
+  const coord_type mTarget;
+  coord_value_type mRadius;
+  coord_type mSearchLb, mSearchUb;
+  const value_type* mNearestNeighbor;
+};
+
+
 template <size_t D,   // Dimension
           typename T, // Point type
           typename A = BraketAccessor<T, double>>
@@ -110,49 +178,10 @@ public:
   using coord_value_type = typename A::value_type;
   using coord_type = std::array<coord_value_type, D>;
   using extent_type = std::pair<coord_type, coord_type>;
+  using node_iterator = NodeIterator<D, T, coord_value_type>;
+  using visitor_type = Visitor<D, T, coord_value_type>;
 
   static constexpr size_t dimension = D;
-
-  class Visitor {
-  public:
-
-    struct Iterator {
-      using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
-      using Queue = std::vector<QueueItem>;
-
-      std::vector<QueueItem> queue;
-      node_type* node;
-      coord_type ub, lb, coords;
-
-      Iterator(size_t reserve) {
-        queue.reserve(reserve);
-      }
-
-      bool loadNext();
-    };
-
-    virtual void visit(struct Iterator& it) = 0;
-  };
-
-  class ClosestPointVisitor : public Visitor
-  {
-  public:
-    ClosestPointVisitor(const coord_type& target,
-                        double radius = std::numeric_limits<double>::max());
-
-    void visit(typename Visitor::Iterator& it) override;
-
-    const T* getClosestPoint() const;
-
-  private:
-    void queueChildren(typename Visitor::Iterator& it);
-
-  private:
-    const coord_type mTarget;
-    double mRadius;
-    coord_type mSearchLb, mSearchUb;
-    const T* mClosestPoint;
-  };
 
 protected:
   A mCoordinateAccessor;
@@ -183,9 +212,12 @@ public:
   void remove(const T& data);
 
   const T* find(const coord_type& target,
-                double radius = std::numeric_limits<double>::infinity()) const;
+                coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  void accept(Visitor* visitor) const;
+  void accept(visitor_type* visitor) const;
+
+  const T* find_visitor(const coord_type& target,
+                        coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 };
 
 template <size_t D, typename T, typename A>
