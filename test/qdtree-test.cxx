@@ -422,7 +422,7 @@ size_t from_env(const char* var, size_t def) {
   } else return def;
 }
 
-TEST(QDTree, find_vector_perf)
+TEST(QDTree, DISABLED_find_vector_perf)
 {
   size_t N = from_env("FIND_ITER", 50);
 
@@ -506,24 +506,24 @@ public:
   using typename Base::node_iterator;
   using typename Base::coord_type;
   using typename Base::coord_value_type;
+  using visited_nodes_type = std::vector<std::pair<coord_type, coord_type>>;
 
   TracedNearestNeighborVisitor(const coord_type& target,
                                coord_value_type radius = std::numeric_limits<coord_value_type>::max())
     : Base(target, radius)
-    , count(0)
   {}
 
   void visit(node_iterator& it) override {
-    ++count;
+    mVisitedNodes.emplace_back(it.lb, it.ub);
     Base::visit(it);
   }
 
-  size_t numberOfVisitedNodes() const {
-    return count;
+  const visited_nodes_type& visitedNodes() const {
+    return mVisitedNodes;
   }
 
 private:
-  size_t count;
+  visited_nodes_type mVisitedNodes;
 };
 
 TEST(QDTree, find_visitor)
@@ -538,13 +538,20 @@ TEST(QDTree, find_visitor)
     }
   }
 
+  using V = TracedNearestNeighborVisitor<Tree::dimension, Tree::value_type, Tree::coord_value_type>;
+
   Tree::coord_type target = {3.0, 3.0};
-  TracedNearestNeighborVisitor<Tree::dimension, Tree::value_type, Tree::coord_value_type> visitor(target);
+  V visitor(target);
   t.accept(&visitor);
   auto closest = visitor.getNearestNeighbor();
-  EXPECT_EQ(visitor.numberOfVisitedNodes(), 4);
   ASSERT_THAT(closest, NotNull());
-  ASSERT_EQ(*closest, Tree::coord_type({3.0, 3.0}));
+  ASSERT_EQ(*closest, target);
+
+  V::visited_nodes_type nodes = {{{0.0, 0.0}, {8.0, 8.0}},
+                                 {{0.0, 0.0}, {4.0, 4.0}},
+                                 {{2.0, 2.0}, {4.0, 4.0}},
+                                 {{3.0, 3.0}, {4.0, 4.0}}};
+  EXPECT_THAT(visitor.visitedNodes(), ElementsAreArray(nodes));
 }
 
 TEST(QDTree, find_visitor_perf)
