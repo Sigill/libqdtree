@@ -66,11 +66,7 @@ void find_vector_bench(size_t N)
   std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
 }
 
-void find_bench(size_t N)
-{
-  auto begin = steady_clock::now();
-
-  Tree t;
+void build_tree(size_t N, Tree& t) {
   t.cover({0.0, 0.0});
   t.cover({(double)N, (double)N});
 
@@ -79,6 +75,14 @@ void find_bench(size_t N)
       t.add({(double)x, (double)y});
     }
   }
+}
+
+void find_bench(size_t N)
+{
+  auto begin = steady_clock::now();
+
+  Tree t;
+  build_tree(N, t);
 
   auto build_end = steady_clock::now();
 
@@ -95,19 +99,36 @@ void find_bench(size_t N)
   std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
 }
 
+void find_external_iterator_bench(size_t N)
+{
+  auto begin = steady_clock::now();
+
+  Tree t;
+  build_tree(N, t);
+
+  auto build_end = steady_clock::now();
+
+  Tree::node_iterator it;
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      auto closest = t.find({(double)x, (double)y}, it);
+      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+    }
+  }
+
+  auto search_end = steady_clock::now();
+
+  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
+  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
+}
+
 void find_visitor_bench(size_t N)
 {
   auto begin = steady_clock::now();
 
   Tree t;
-  t.cover({0.0, 0.0});
-  t.cover({(double)N, (double)N});
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      t.add({(double)x, (double)y});
-    }
-  }
+  build_tree(N, t);
 
   auto build_end = steady_clock::now();
 
@@ -125,12 +146,39 @@ void find_visitor_bench(size_t N)
   std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
 }
 
+void find_visitor_external_iterator_bench(size_t N)
+{
+  auto begin = steady_clock::now();
+
+  Tree t;
+  build_tree(N, t);
+
+  auto build_end = steady_clock::now();
+
+  Tree::node_iterator it;
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      Tree::coord_type target = {(double)x, (double)y};
+      auto closest = t.find_visitor(target, it);
+      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+    }
+  }
+
+  auto search_end = steady_clock::now();
+
+  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
+  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
+}
+
 int main(int argc, char** argv)
 {
   const std::map<std::string, std::function<void(size_t)>> available_tests = {
-  {"find_vector" , &find_vector_bench},
-  {"find"        , &find_bench},
-  {"find_visitor", &find_visitor_bench}};
+  {"find_vector"                   , &find_vector_bench},
+  {"find"                          , &find_bench},
+  {"find_external_iterator"        , &find_external_iterator_bench},
+  {"find_visitor"                  , &find_visitor_bench},
+  {"find_visitor_external_iterator", &find_visitor_external_iterator_bench}};
 
   std::vector<std::string> to_run;
   size_t size;

@@ -32,6 +32,7 @@ struct BraketAccessor
   U operator()(const T& v, const size_t i) const;
 };
 
+
 template <size_t D, typename T>
 class Node
 {
@@ -99,7 +100,7 @@ std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m
 
 
 template <size_t D, typename T, // Same as in Node<D, T>
-          typename C>           //
+          typename C>           // Integral coordinates type
 class NodeIterator
 {
 public:
@@ -112,6 +113,8 @@ public:
   Queue queue;
   node_type* node;
   coord_type ub, lb, coords;
+
+  NodeIterator() {}
 
   NodeIterator(size_t reserve) {
     queue.reserve(reserve);
@@ -134,7 +137,8 @@ public:
   void queueChildren();
 };
 
-template <size_t D, typename T, typename C>
+template <size_t D, typename T, // Same as in Node<D, T>
+          typename C>           // Integral coordinates type
 class Visitor {
 public:
   using node_iterator = NodeIterator<D, T, C>;
@@ -212,9 +216,20 @@ public:
   void remove(const T& data);
 
   const T* find(const coord_type& target,
+                node_iterator& iterator,
                 coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
+  const T* find(const coord_type& target,
+                coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+
+  void accept(visitor_type* visitor,
+              node_iterator& iterator) const;
+
   void accept(visitor_type* visitor) const;
+
+  const T* find_visitor(const coord_type& target,
+                        node_iterator& iterator,
+                        coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
   const T* find_visitor(const coord_type& target,
                         coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;

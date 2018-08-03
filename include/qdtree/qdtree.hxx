@@ -283,7 +283,7 @@ QDTree<D, T, A>::~QDTree()
 
 template <size_t D, typename T, typename A>
 inline typename QDTree<D, T, A>::coord_type
-QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in) const
+QDTree<D, T, A>::coordinates(const value_type& in) const
 {
   QDTree<D, T, A>::coord_type out;
   for(size_t i = 0; i < D; ++i)
@@ -292,8 +292,8 @@ QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in) const
 }
 
 template <size_t D, typename T, typename A>
-inline void QDTree<D, T, A>::coordinates(const QDTree<D, T, A>::value_type& in,
-                                         QDTree<D, T, A>::coord_type& out) const
+inline void QDTree<D, T, A>::coordinates(const value_type& in,
+                                         coord_type& out) const
 {
   for(size_t i = 0; i < D; ++i)
     out[i] = mCoordinateAccessor(in, i);
@@ -321,7 +321,7 @@ typename QDTree<D, T, A>::extent_type QDTree<D, T, A>::extent() const {
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::cover(const typename QDTree<D, T, A>::coord_type& p)
+void QDTree<D, T, A>::cover(const coord_type& p)
 {
   coord_type a = mLb, b = mUb;
 
@@ -562,14 +562,15 @@ void QDTree<D, T, A>::remove(const T& data) {
 }
 
 template <size_t D, typename T, typename A>
-const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
-                               QDTree<D, T, A>::coord_value_type radius) const
+const T* QDTree<D, T, A>::find(const coord_type& target,
+                               node_iterator& it,
+                               coord_value_type radius) const
 {
   const T* needle = nullptr;
   coord_type search_lb = lowerBound();
   coord_type search_ub = upperBound();
 
-  node_iterator it(node_type::number_of_children * 8);
+  it.queue.clear();
   if (mRoot != nullptr) {
     it.queue.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
   }
@@ -582,8 +583,6 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
     radius *= radius;
   }
 
-//  size_t visit_count = 0;
-
   LOGLN("Search extent: " << print_extent(search_lb, search_ub));
 
   while(it.loadNext()) {
@@ -591,8 +590,6 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
 
     if (it.node == nullptr)
       continue;
-
-//    ++visit_count;
 
     // Stop searching if this node can't contain a closer data.
     if (is_outside(it.lb, it.ub, search_lb, search_ub)) {
@@ -635,26 +632,30 @@ const T* QDTree<D, T, A>::find(const QDTree<D, T, A>::coord_type& target,
     }
   }
 
-//  std::cout << visit_count << " nodes visited" << std::endl;
-
   return needle;
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::accept(QDTree<D, T, A>::visitor_type *visitor) const
+const T* QDTree<D, T, A>::find(const coord_type& target,
+                               coord_value_type radius) const
 {
-  node_iterator iterator(node_type::number_of_children * 8);
+  node_iterator it(node_type::number_of_children * 8);
+  return find(target, it, radius);
+}
+
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::accept(visitor_type *visitor,
+                             node_iterator& iterator) const
+{
+  iterator.queue.clear();
+
   if (mRoot != nullptr) {
     iterator.queue.emplace_back(mRoot, lowerBound(), upperBound());
   }
 
-//  size_t visit_count = 0;
-
   while(iterator.loadNext()) {
     if (iterator.node == nullptr)
       continue;
-
-//    ++visit_count;
 
     LOGLN("Visiting " << iterator.node << ": " << print_extent(iterator.lb, iterator.ub));
 
@@ -663,13 +664,28 @@ void QDTree<D, T, A>::accept(QDTree<D, T, A>::visitor_type *visitor) const
 
     visitor->visit(iterator);
   }
-
-//  std::cout << visit_count << " nodes visited" << std::endl;
 }
 
 template <size_t D, typename T, typename A>
-const T* QDTree<D, T, A>::find_visitor(const QDTree<D, T, A>::coord_type& target,
-                                       QDTree<D, T, A>::coord_value_type radius) const
+void QDTree<D, T, A>::accept(visitor_type *visitor) const
+{
+  node_iterator iterator(node_type::number_of_children * 8);
+  return accept(visitor, iterator);
+}
+
+template <size_t D, typename T, typename A>
+const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
+                                       node_iterator& iterator,
+                                       coord_value_type radius) const
+{
+  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  accept(&visitor, iterator);
+  return visitor.getNearestNeighbor();
+}
+
+template <size_t D, typename T, typename A>
+const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
+                                       coord_value_type radius) const
 {
   NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
   accept(&visitor);
