@@ -54,7 +54,7 @@ U BraketAccessor<T, U>::operator()(const T& v, const size_t i) const
 
 template<typename T, size_t D>
 inline std::array<T, D> middle(const std::array<T, D>& lb,
-                        const std::array<T, D>& ub)
+                               const std::array<T, D>& ub)
 {
   std::array<T, D> m;
   for(size_t i = 0; i < D; ++i) {
@@ -65,9 +65,9 @@ inline std::array<T, D> middle(const std::array<T, D>& lb,
 
 template<typename T, size_t D>
 inline void compute_inner_extent(std::array<T, D>& lb,
-                          std::array<T, D>& ub,
-                          const std::array<T, D>& center,
-                          const size_t index)
+                                 std::array<T, D>& ub,
+                                 const std::array<T, D>& center,
+                                 const size_t index)
 {
   for(size_t i = 0; i < D; ++i) {
     if (index >> i & 1) {
@@ -80,7 +80,7 @@ inline void compute_inner_extent(std::array<T, D>& lb,
 
 template<typename T, size_t D>
 inline std::bitset<D> get_inner_position(const std::array<T, D>& point,
-                                     const std::array<T, D>& ref)
+                                         const std::array<T, D>& ref)
 {
   std::bitset<D> position;
   for(size_t i = 0; i < D; ++i) {
@@ -91,10 +91,10 @@ inline std::bitset<D> get_inner_position(const std::array<T, D>& point,
 
 template<typename T, size_t D>
 inline void get_inner_position(const std::array<T, D>& point,
-                        std::array<T, D>& lb,
-                        std::array<T, D>& ub,
-                        const std::array<T, D>& center,
-                        std::bitset<D>& position)
+                               std::array<T, D>& lb,
+                               std::array<T, D>& ub,
+                               const std::array<T, D>& center,
+                               std::bitset<D>& position)
 {
   position.reset();
 
@@ -110,8 +110,8 @@ inline void get_inner_position(const std::array<T, D>& point,
 
 template <typename T, size_t D>
 inline bool is_outside(const std::array<T, D>& c,
-                const std::array<T, D>& lb,
-                const std::array<T, D>& ub)
+                       const std::array<T, D>& lb,
+                       const std::array<T, D>& ub)
 {
   bool x = false;
   for(size_t i = 0; i < D; ++i) {
@@ -122,9 +122,9 @@ inline bool is_outside(const std::array<T, D>& c,
 
 template <typename T, size_t D>
 inline bool is_outside(const std::array<T, D>& c_lb,
-                const std::array<T, D>& c_ub,
-                const std::array<T, D>& lb,
-                const std::array<T, D>& ub)
+                       const std::array<T, D>& c_ub,
+                       const std::array<T, D>& lb,
+                       const std::array<T, D>& ub)
 {
   bool x = false;
   for(size_t i = 0; i < D; ++i) {
