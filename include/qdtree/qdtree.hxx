@@ -171,9 +171,40 @@ Node<D, T>::Node(size_t i, Node<D, T>* child)
 }
 
 template <size_t D, typename T>
-Node<D, T>::~Node() {
-  for (size_t i = 0; i < number_of_children; ++i)
-    delete mChildren[i];
+Node<D, T>::Node(const value_list_type& otherData)
+  : mChildren{}
+  , mData(otherData)
+{}
+
+template <size_t D, typename T>
+Node<D, T>::Node(const Node& other)
+  : mChildren{}
+  , mData(other.mData)
+{
+  // Do not perform the copy recursively.
+  // First make a shallow (data only) copy of the node, and push it in a
+  // queue (along with the original node it's copied from).
+  // Until the queue is empty, pop the last entry, set its children to shallow
+  // copies of the children of the original node, and push them to the queue.
+  std::vector<std::pair<Node*, const Node* const>> nodes;
+  nodes.emplace_back(this, &other);
+
+  Node* to;
+  const Node* from;
+  while(!nodes.empty()) {
+    std::tie(to, from) = nodes.back();
+    nodes.pop_back();
+
+    for(size_t i = 0; i < Node::number_of_children; ++i) {
+      const Node* fromChild = from->child(i);
+
+      if (fromChild != nullptr) {
+        Node* toChild = new Node(fromChild->mData);
+        to->setChild(i, toChild);
+        nodes.emplace_back(toChild, fromChild);
+      }
+    }
+  }
 }
 
 template <size_t D, typename T>
@@ -215,7 +246,7 @@ void Node<D, T>::removeChild(size_t i) {
 }
 
 template <size_t D, typename T>
-void Node<D, T>::truncate() {
+inline void Node<D, T>::truncate() {
   mChildren.fill(nullptr);
 }
 
@@ -266,6 +297,28 @@ bool Node<D, T>::removeData(const T& data) {
   return false;
 }
 
+template <size_t D, typename T>
+void Node<D, T>::destroy(Node* node)
+{
+  if (node == nullptr)
+    return;
+
+  std::vector<Node*> nodes;
+  nodes.push_back(node);
+
+  while(!nodes.empty()) {
+    Node* node = nodes.back();
+    nodes.pop_back();
+
+    for(Node* child : node->children()) {
+      if (child != nullptr)
+        nodes.push_back(child);
+    }
+
+    delete node;
+  }
+}
+
 
 template <size_t D, typename T, typename A>
 QDTree<D, T, A>::QDTree()
@@ -276,9 +329,60 @@ QDTree<D, T, A>::QDTree()
 {}
 
 template <size_t D, typename T, typename A>
+QDTree<D, T, A>::QDTree(const QDTree& other)
+  : mCoordinateAccessor(other.mCoordinateAccessor)
+  , mLb(other.mLb)
+  , mUb(other.mUb)
+  , mRoot(nullptr)
+{
+  if (other.mRoot != nullptr)
+    mRoot = new node_type(*(other.mRoot));
+}
+
+template <size_t D, typename T, typename A>
+QDTree<D, T, A>::QDTree(QDTree&& other) noexcept
+  : mCoordinateAccessor(std::move(other.mCoordinateAccessor))
+  , mLb(std::move(other.mLb))
+  , mUb(std::move(other.mUb))
+  , mRoot(other.mRoot)
+{
+  other.mRoot = nullptr;
+}
+
+template <size_t D, typename T, typename A>
 QDTree<D, T, A>::~QDTree()
 {
-  delete mRoot;
+  node_type::destroy(mRoot);
+}
+
+template <size_t D, typename T, typename A>
+QDTree<D, T, A>& QDTree<D, T, A>::operator=(const QDTree& other)
+{
+  if (this == &other) return *this;
+
+  mCoordinateAccessor = other.mCoordinateAccessor;
+  mLb = other.mLb;
+  mUb = other.mUb;
+
+  if (other.mRoot == nullptr)
+    mRoot = nullptr;
+  else
+    mRoot = new node_type(*(other.mRoot));
+
+  return *this;
+}
+
+template <size_t D, typename T, typename A>
+QDTree<D, T, A>& QDTree<D, T, A>::operator=(QDTree&& other) noexcept
+{
+  if (this == &other) return *this;
+
+  std::swap(mCoordinateAccessor, other.mCoordinateAccessor);
+  std::swap(mLb, other.mLb);
+  std::swap(mUb, other.mUb);
+  std::swap(mRoot, other.mRoot);
+
+  return *this;
 }
 
 template <size_t D, typename T, typename A>
@@ -370,11 +474,24 @@ void QDTree<D, T, A>::cover(const coord_type& p)
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::add(const T& data) {
+void QDTree<D, T, A>::add(const T& data)
+{
   coord_type coord = coordinates(data);
 
   cover(coord);
+  add(data, coord);
+}
 
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::unsafe_add(const T& data)
+{
+  coord_type coord = coordinates(data);
+
+  add(data, coord);
+}
+
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::add(const T& data, const coord_type& coord) {
   LOGLN("# Adding " << data);
 
   // If the tree is empty, initialize the root as a leaf.
@@ -534,7 +651,7 @@ void QDTree<D, T, A>::remove(const T& data) {
   // If this is the root point, remove it.
   if (parent == nullptr) {
     ILOGLN(level, "Root node is now empty, removing it");
-    delete mRoot;
+    node_type::destroy(mRoot);
     mRoot = nullptr;
     return;
   }
@@ -551,7 +668,7 @@ void QDTree<D, T, A>::remove(const T& data) {
 
     if (retainer == nullptr) {
       LOGLN("collapsing everything, " << node << " is new root");
-      delete mRoot;
+      node_type::destroy(mRoot);
       mRoot = node;
     } else {
       LOGLN("collapsing " << node << " into " << retainer);

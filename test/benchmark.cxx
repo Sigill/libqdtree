@@ -26,6 +26,35 @@ void _ensure(const char* expression, const char* file, int line)
 
 #define ensure(EXPRESSION) ((EXPRESSION) ? (void)0 : _ensure(#EXPRESSION, __FILE__, __LINE__))
 
+void add_bench(size_t N)
+{
+  auto begin = steady_clock::now();
+
+  Tree t1;
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      t1.add({(double)x, (double)y});
+    }
+  }
+
+  auto add_end = steady_clock::now();
+
+  Tree t2;
+  t2.cover({0.0, 0.0});
+  t2.cover({(double)N, (double)N});
+
+  for(size_t y = 0; y < N; ++y) {
+    for(size_t x = 0; x < N; ++x) {
+      t2.unsafe_add({(double)x, (double)y});
+    }
+  }
+
+  auto unsafe_add_end = steady_clock::now();
+
+  std::cout << "Safe add   : " << elapsed(begin, add_end) << " ms" << std::endl;
+  std::cout << "Unsafe add : " << elapsed(add_end, unsafe_add_end) << " ms" << std::endl;
+}
+
 void find_vector_bench(size_t N)
 {
   auto begin = steady_clock::now();
@@ -66,23 +95,25 @@ void find_vector_bench(size_t N)
   std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
 }
 
-void build_tree(size_t N, Tree& t) {
+Tree build_tree(size_t N)
+{
+  Tree t;
   t.cover({0.0, 0.0});
   t.cover({(double)N, (double)N});
 
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
-      t.add({(double)x, (double)y});
+      t.unsafe_add({(double)x, (double)y});
     }
   }
+  return t;
 }
 
 void find_bench(size_t N)
 {
   auto begin = steady_clock::now();
 
-  Tree t;
-  build_tree(N, t);
+  Tree t = build_tree(N);
 
   auto build_end = steady_clock::now();
 
@@ -103,8 +134,7 @@ void find_external_iterator_bench(size_t N)
 {
   auto begin = steady_clock::now();
 
-  Tree t;
-  build_tree(N, t);
+  Tree t = build_tree(N);
 
   auto build_end = steady_clock::now();
 
@@ -127,8 +157,7 @@ void find_visitor_bench(size_t N)
 {
   auto begin = steady_clock::now();
 
-  Tree t;
-  build_tree(N, t);
+  Tree t = build_tree(N);
 
   auto build_end = steady_clock::now();
 
@@ -150,8 +179,7 @@ void find_visitor_external_iterator_bench(size_t N)
 {
   auto begin = steady_clock::now();
 
-  Tree t;
-  build_tree(N, t);
+  Tree t = build_tree(N);
 
   auto build_end = steady_clock::now();
 
@@ -174,6 +202,7 @@ void find_visitor_external_iterator_bench(size_t N)
 int main(int argc, char** argv)
 {
   const std::map<std::string, std::function<void(size_t)>> available_tests = {
+  {"add"                           , &add_bench},
   {"find_vector"                   , &find_vector_bench},
   {"find"                          , &find_bench},
   {"find_external_iterator"        , &find_external_iterator_bench},
@@ -223,7 +252,11 @@ int main(int argc, char** argv)
   for(const auto& test_name : to_run) {
     const auto& test = available_tests.find(test_name);
     std::cout << "Running: " << test_name << std::endl;
+    auto begin = steady_clock::now();
+
     test->second(size);
+
+    std::cout << "Total time: " << elapsed(begin, steady_clock::now()) << " ms" << std::endl;
   }
 
   return 0;

@@ -45,11 +45,26 @@ public:
 
   Node();
 
-  Node(const value_type& d);
+  explicit Node(const value_type& d);
 
   Node(size_t i, Node* child);
 
-  ~Node();
+private:
+  /**
+   * @brief Constructor used by the copy constructor to perform a deep copy.
+   *
+   * This constructor only copy data. Children are handled by the deep copy
+   * constructor.
+   *
+   * \sa Node(const Node&)
+   */
+  explicit Node(const value_list_type& otherData);
+
+public:
+  /**
+   * @brief Perform a deep copy.
+   */
+  Node(const Node& other);
 
   Node* child(size_t i) const;
 
@@ -76,6 +91,30 @@ public:
   void addData(const T& data);
 
   bool removeData(const T& data);
+
+  /**
+   * @brief Delete \p node and every children below.
+   *
+   * We could let the delete operator delete all of its children,
+   * but that process would be recursive. This method flatten the
+   * whole tree in order to delete everything iteratively.
+   *
+   * @param node The node to delete.
+   */
+  static void destroy(Node* node);
+
+private:
+  /**
+   * @brief Destructor.
+   *
+   * This destructor is private because it shall not be used directly.
+   * Use destroy() instead to properly delete a node and all of its children.
+   * Since destroy() takes care of deleting every children of a node,
+   * this destructor only have to release the memory by the node.
+   *
+   * \sa destroy()
+   */
+  ~Node() = default;
 
 protected:
   child_list_type mChildren;
@@ -194,8 +233,13 @@ protected:
 
 public:
   QDTree();
+  QDTree(const QDTree& other);
+  QDTree(QDTree&& other) noexcept;
 
   ~QDTree();
+
+  QDTree& operator=(const QDTree& other);
+  QDTree& operator=(QDTree&& other) noexcept;
 
   coord_type coordinates(const value_type& in) const;
 
@@ -212,6 +256,8 @@ public:
   void cover(const coord_type& p);
 
   void add(const T& data);
+
+  void unsafe_add(const T& data);
 
   void remove(const T& data);
 
@@ -233,6 +279,9 @@ public:
 
   const T* find_visitor(const coord_type& target,
                         coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+
+private:
+  void add(const T& data, const coord_type &coord);
 };
 
 template <size_t D, typename T, typename A>

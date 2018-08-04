@@ -296,7 +296,7 @@ TEST(QDTree, add)
   // Both indexes are different, no more splitting needed.
   // +---------+---------+ 1
   // |         |         |
-  // +         +         +
+  // |         |         |
   // |         |         |
   // +---------+----+----+ .5
   // |         |    |    |
@@ -322,7 +322,7 @@ TEST(QDTree, remove)
   t.add({0.5, 0.0});
   // +---------+---------+ 1
   // |         |         |
-  // +         +         +
+  // |         |         |
   // |         |         |
   // +---------+----+----+ .5
   // |         |    |    |
@@ -354,13 +354,13 @@ TEST(QDTree, remove)
   // Nodes will have collapsed.
   // +---------+---------+ 1
   // |         |         |
-  // +         +         +
   // |         |         |
-  // +---------+----+----+ .5
   // |         |         |
-  // |   0;0   +  .5;0   +
+  // +---------+---------+ .5
   // |         |         |
-  // +---------+----+----+ 0
+  // |   0;0   |  .5;0   |
+  // |         |         |
+  // +---------+---------+ 0
   // 0        .5         1
   EXPECT_THAT(t, Root(ChildrenMatch({
                                       {0, PointsAre({0.0, 0.0})},
@@ -373,7 +373,7 @@ TEST(QDTree, remove)
   // Nodes will have collapsed.
   // +---------+ 1
   // |         |
-  // +  .5;0   +
+  // |  .5;0   |
   // |         |
   // +---------+ 0
   // 0         1
@@ -384,6 +384,86 @@ TEST(QDTree, remove)
   t.remove({0.5, 0.0});
   EXPECT_THAT(t, Root(IsNull()));
   EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+}
+
+TEST(QDTree, copy_ctor)
+{
+  Tree t;
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(t);
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointsAre({0.0, 0.0})},
+                                       {1, PointsAre({1.0, 0.0})}}
+                                     )));
+}
+
+TEST(QDTree, move_ctor)
+{
+  Tree t;
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(std::move(t));
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointsAre({0.0, 0.0})},
+                                       {1, PointsAre({1.0, 0.0})}}
+                                     )));
+
+  EXPECT_THAT(t, Root(IsNull()));
+}
+
+TEST(QDTree, copy_op)
+{
+  Tree t;
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
+                                    )));
+
+  Tree t2 = t;
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
+                                    )));
+}
+
+TEST(QDTree, move_op)
+{
+  Tree t;
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({1.0, 0.0})}}
+                                    )));
+
+  Tree t2 = std::move(t);
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointsAre({0.0, 0.0})},
+                                       {1, PointsAre({1.0, 0.0})}}
+                                     )));
+
+  EXPECT_THAT(t, Root(IsNull()));
 }
 
 TEST(QDTree, find)
