@@ -15,11 +15,6 @@
 namespace qdtree
 {
 
-// It is mandatory to instruct the compiler to search for operator<< in the
-// global namespace, otherwise it will only look for one in ::qdtree and
-// won't find the one associated to QDTree::value_type (user-defined).
-using ::operator<<;
-
 #ifdef HAS_INSTR
 #define LOG(x) std::cout << x << std::flush;
 #define LOGLN(x) LOG(x << "\n")

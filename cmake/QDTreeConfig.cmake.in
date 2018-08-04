@@ -1,0 +1,6 @@
+get_filename_component(PACKAGE_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(QDTREE_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+
+if(NOT TARGET qdtree)
+  include("${PACKAGE_CMAKE_DIR}/@QDTREE_EXPORT@.cmake")
+endif()

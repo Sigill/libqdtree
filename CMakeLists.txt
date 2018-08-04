@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 2.8)
-project(libqtree)
+project(QDTree)
+
+set(QDTREE_VERSION "0.1.0")
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 option(ENABLE_INSTRUMENTATION "Enable internal log messages" OFF)
 if(ENABLE_INSTRUMENTATION)
@@ -8,9 +13,66 @@ endif()
 
 option(BUILD_TEST "Build unit tests and benchmarks" OFF)
 
+set(QDTREE_PUBLIC_HEADERS
+  include/qdtree/infix_iterator.hxx
+  include/qdtree/qdtree_def.hxx
+  include/qdtree/qdtree.hxx
+  include/qdtree/utils_def.hxx
+  include/qdtree/utils.hxx
+  )
+
 add_library(qdtree src/utils.cxx)
 target_include_directories(qdtree
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+         $<INSTALL_INTERFACE:include>)
+
+# Define public headers to get them automatically installed.
+set_target_properties(qdtree PROPERTIES
+  PUBLIC_HEADER "${QDTREE_PUBLIC_HEADERS}")
+
+set(QDTREE_EXPORT QDTreeTargets)
+
+# Install the lib and its headers. Flag it for export.
+install(TARGETS qdtree
+  EXPORT ${QDTREE_EXPORT}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/qdtree
+  )
+
+# Create the export file for the build tree.
+export(TARGETS qdtree FILE "${PROJECT_BINARY_DIR}/${QDTREE_EXPORT}.cmake")
+# Create the export file for the install tree.
+install(EXPORT ${QDTREE_EXPORT}
+  DESTINATION "${CMAKE_INSTALL_PREFIX}")
+
+# The config files could be generated using a macro (see [1]), but it seems
+# to be more complex than to do it manually (see [2]).
+# [1] https://cmake.org/cmake/help/latest/module/CMakePackageConfigHelpers.html
+# [2] https://gitlab.kitware.com/cmake/community/wikis/doc/tutorials/How-to-create-a-ProjectConfig.cmake-file
+
+# Create the config file for the build tree.
+set(CONF_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+configure_file(cmake/QDTreeConfig.cmake.in
+  "${PROJECT_BINARY_DIR}/QDTreeConfig.cmake" @ONLY)
+
+# Create the config file for the install tree.
+set(CONF_INCLUDE_DIRS "\${PACKAGE_CMAKE_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
+configure_file(cmake/QDTreeConfig.cmake.in
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/QDTreeConfig.cmake" @ONLY)
+
+# Create the package version file.
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/QDTreeConfigVersion.cmake"
+  VERSION "${QDTREE_VERSION}"
+  COMPATIBILITY SameMajorVersion)
+
+# Install both the config and version file.
+install(FILES
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/QDTreeConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/QDTreeConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}")
+
 
 if(BUILD_TEST)
   find_package(GTest REQUIRED)
