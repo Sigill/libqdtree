@@ -6,8 +6,12 @@
 #include <chrono>
 #include <iostream>
 #include <functional>
+#include <cstdlib>
+#include <cstdio>
 
 #include <boost/program_options.hpp>
+
+#include "rang.hpp"
 
 using namespace std::chrono;
 namespace po = boost::program_options;
@@ -20,7 +24,7 @@ auto elapsed(const steady_clock::time_point& begin,
 
 void _ensure(const char* expression, const char* file, int line)
 {
-  fprintf(stderr, "Assertion '%s' failed, file '%s' line '%d'.", expression, file, line);
+  fprintf(stderr, "Assertion '%s' failed at '%s:%d'.\n", expression, file, line);
   abort();
 }
 
@@ -51,8 +55,8 @@ void add_bench(size_t N)
 
   auto unsafe_add_end = steady_clock::now();
 
-  std::cout << "Safe add   : " << elapsed(begin, add_end) << " ms" << std::endl;
-  std::cout << "Unsafe add : " << elapsed(add_end, unsafe_add_end) << " ms" << std::endl;
+  std::cout << "Safe add: " << elapsed(begin, add_end) << " ms" << std::endl;
+  std::cout << "Unsafe add: " << elapsed(add_end, unsafe_add_end) << " ms" << std::endl;
 }
 
 void find_vector_bench(size_t N)
@@ -251,7 +255,9 @@ int main(int argc, char** argv)
 
   for(const auto& test_name : to_run) {
     const auto& test = available_tests.find(test_name);
-    std::cout << "Running: " << test_name << std::endl;
+    std::cout << "Running: "
+              << rang::fg::green << test_name << rang::style::reset
+              << std::endl;
     auto begin = steady_clock::now();
 
     test->second(size);
