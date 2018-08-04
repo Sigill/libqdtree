@@ -11,7 +11,7 @@ if(ENABLE_INSTRUMENTATION)
   add_definitions(-DHAS_INSTR)
 endif()
 
-option(BUILD_TEST "Build unit tests and benchmarks" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 set(QDTREE_PUBLIC_HEADERS
   include/qdtree/infix_iterator.hxx
@@ -73,8 +73,9 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/QDTreeConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_PREFIX}")
 
+include(CTest)
 
-if(BUILD_TEST)
+if(BUILD_TESTING)
   find_package(GTest REQUIRED)
   find_package(GMock REQUIRED)
   enable_testing()
