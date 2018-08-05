@@ -1,5 +1,5 @@
-#ifndef OCTREE_HXX
-#define OCTREE_HXX
+#ifndef QUADTREE_HXX
+#define QUADTREE_HXX
 
 #include <array>
 #include <iosfwd>
@@ -11,4 +11,4 @@ std::ostream& operator<<(std::ostream& out, const Point& p);
 
 using Tree = qdtree::QDTree<2, Point>;
 
-#endif // OCTREE_HXX
+#endif // QUADTREE_HXX

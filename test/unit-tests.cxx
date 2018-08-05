@@ -472,7 +472,6 @@ TEST(QDTree, find)
   t.cover({0.0, 0.0});
   t.cover({5.0, 5.0});
 
-  Tree::coord_type c;
   for(size_t y = 0; y < 5; ++y) {
     for(size_t x = 0; x < 5; ++x) {
       t.add({(double)x, (double)y});
@@ -481,7 +480,7 @@ TEST(QDTree, find)
 
   auto n = t.find({3.0, 3.0});
   ASSERT_THAT(n, NotNull());
-  ASSERT_EQ(*n, Tree::coord_type({3.0, 3.0}));
+  ASSERT_EQ(*n, Point({3.0, 3.0}));
 }
 
 template <size_t D, typename T, typename C>

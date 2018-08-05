@@ -84,7 +84,7 @@ if(BUILD_TESTING)
   target_include_directories(quadtree PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/test)
   target_link_libraries(quadtree PRIVATE qdtree)
 
-  add_executable(unit-tests test/qdtree-test.cxx)
+  add_executable(unit-tests test/unit-tests.cxx)
   target_link_libraries(unit-tests
     PRIVATE quadtree ${GMOCK_MAIN_LIBRARIES} Threads::Threads)
   gtest_add_tests(unit-tests "" AUTO)
@@ -113,8 +113,10 @@ if(BUILD_TESTING)
   add_dependencies(rang rang_external)
 
   add_executable(benchmark test/benchmark.cxx)
-  target_include_directories(benchmark
-    PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(benchmark
     PRIVATE quadtree ${Boost_LIBRARIES} rang)
+
+  add_executable(benchmark2 test/benchmark2.cxx)
+  target_link_libraries(benchmark2
+    PRIVATE qdtree ${Boost_LIBRARIES} rang)
 endif()
