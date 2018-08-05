@@ -82,7 +82,7 @@ if(BUILD_TESTING)
 
   add_library(quadtree STATIC test/quadtree.cxx)
   target_include_directories(quadtree PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/test)
-  target_link_libraries(quadtree PUBLIC qdtree)
+  target_link_libraries(quadtree PRIVATE qdtree)
 
   add_executable(unit-tests test/qdtree-test.cxx)
   target_link_libraries(unit-tests
