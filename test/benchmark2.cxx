@@ -33,7 +33,7 @@ void _ensure(const char* expression, const char* file, int line)
 class Point {
 public:
   Point(double x, double y)
-    : mX(x), mY(y) {}
+    : mX(x), mY(y), mTouched(false) {}
 
   double x() const { return mX; }
   double y() const { return mY; }
@@ -41,8 +41,11 @@ public:
   void setX(double x) { mX = x; }
   void setY(double y) { mY = y; }
 
+  void touch() { mTouched = true; }
+
 private:
   double mX, mY;
+  bool mTouched;
 };
 
 bool operator==(const Point& lhs, const Point& rhs) {
@@ -100,15 +103,22 @@ void value_bench(size_t N) {
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  auto n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && *n == Point({double(N-1), double(N-1)}));
+  {
+    Point* n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && *n == Point({double(N-1), double(N-1)}));
+    n->touch();
+  }
 
-  //n->setX(42);
-  // Compile error, n is a pointer to a _constant Point_.
+  {
+    const Point* n = static_cast<const Tree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && *n == Point({0.0, 0.0}));
+    // Compile error, n is a pointer to a _constant Point_.
+    //n->touch();
+  }
 }
 
 void reference_bench(size_t N) {
-  using Tree = qdtree::QDTree<2, std::reference_wrapper<const Point>, XYRefAccessor>;
+  using Tree = qdtree::QDTree<2, std::reference_wrapper<Point>, XYRefAccessor>;
 
   auto points = make_points(N);
 
@@ -121,12 +131,23 @@ void reference_bench(size_t N) {
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  auto n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && &(n->get()) == &points.back());
+  {
+    auto n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && &(n->get()) == &points.back());
+    n->get().touch();
+    *n = points.front();
+  }
 
-  //n->get().setX(42);
-  // Compile error, n is a pointer to a constant reference to a _constant Point_.
-  // It would compile with QDTree<_, std::reference_wrapper<Point>, _>.
+  {
+    auto n = static_cast<const Tree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && n->get() == Point({0.0, 0.0}));
+    n->get().touch();
+    // Compile error, n is a pointer to a _constant reference_wrapper_.
+    //*n = points.front();
+  }
+
+  // In both cases (const and non-const) it's possible to edit the retrieved
+  // Point. Use std::reference_wrapper<const Point> to prevent it.
 }
 
 void pointer_bench(size_t N) {

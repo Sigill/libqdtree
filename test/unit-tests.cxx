@@ -481,6 +481,11 @@ TEST(QDTree, find)
   auto n = t.find({3.0, 3.0});
   ASSERT_THAT(n, NotNull());
   ASSERT_EQ(*n, Point({3.0, 3.0}));
+
+  auto n2 = static_cast<const Tree&>(t).find({4.0, 4.0});
+
+  ASSERT_THAT(n2, NotNull());
+  ASSERT_EQ(*n2, Point({4.0, 4.0}));
 }
 
 template <size_t D, typename T, typename C>

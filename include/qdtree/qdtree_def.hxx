@@ -221,7 +221,7 @@ public:
   using coord_value_type = typename A::value_type;
   using coord_type = std::array<coord_value_type, D>;
   using extent_type = std::pair<coord_type, coord_type>;
-  using node_iterator = NodeIterator<D, T, coord_value_type>;
+  using node_iterator_type = NodeIterator<D, T, coord_value_type>;
   using visitor_type = Visitor<D, T, coord_value_type>;
 
   static constexpr size_t dimension = D;
@@ -262,19 +262,26 @@ public:
   void remove(const T& data);
 
   const T* find(const coord_type& target,
-                node_iterator& iterator,
+                node_iterator_type& iterator,
                 coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+
+  T* find(const coord_type& target,
+          node_iterator_type& iterator,
+          coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
   const T* find(const coord_type& target,
                 coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
+  T* find(const coord_type& target,
+          coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+
   void accept(visitor_type* visitor,
-              node_iterator& iterator) const;
+              node_iterator_type& iterator) const;
 
   void accept(visitor_type* visitor) const;
 
   const T* find_visitor(const coord_type& target,
-                        node_iterator& iterator,
+                        node_iterator_type& iterator,
                         coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
   const T* find_visitor(const coord_type& target,

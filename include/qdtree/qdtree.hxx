@@ -675,7 +675,7 @@ void QDTree<D, T, A>::remove(const T& data) {
 
 template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find(const coord_type& target,
-                               node_iterator& it,
+                               node_iterator_type& it,
                                coord_value_type radius) const
 {
   const T* needle = nullptr;
@@ -748,16 +748,35 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
 }
 
 template <size_t D, typename T, typename A>
+T* QDTree<D, T, A>::find(const coord_type& target,
+                         node_iterator_type& it,
+                         coord_value_type radius)
+{
+  return const_cast<T*>(
+        static_cast<const QDTree&>(*this).find(target, it, radius)
+        );
+}
+
+template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find(const coord_type& target,
                                coord_value_type radius) const
 {
-  node_iterator it(node_type::number_of_children * 8);
+  node_iterator_type it(node_type::number_of_children * 8);
   return find(target, it, radius);
 }
 
 template <size_t D, typename T, typename A>
+T* QDTree<D, T, A>::find(const coord_type& target,
+                         coord_value_type radius)
+{
+  return const_cast<T*>(
+        static_cast<const QDTree&>(*this).find(target, radius)
+        );
+}
+
+template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::accept(visitor_type *visitor,
-                             node_iterator& iterator) const
+                             node_iterator_type& iterator) const
 {
   iterator.queue.clear();
 
@@ -781,13 +800,13 @@ void QDTree<D, T, A>::accept(visitor_type *visitor,
 template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::accept(visitor_type *visitor) const
 {
-  node_iterator iterator(node_type::number_of_children * 8);
+  node_iterator_type iterator(node_type::number_of_children * 8);
   return accept(visitor, iterator);
 }
 
 template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
-                                       node_iterator& iterator,
+                                       node_iterator_type& iterator,
                                        coord_value_type radius) const
 {
   NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);

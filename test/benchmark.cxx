@@ -142,7 +142,7 @@ void find_external_iterator_bench(size_t N)
 
   auto build_end = steady_clock::now();
 
-  Tree::node_iterator it;
+  Tree::node_iterator_type it;
 
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
@@ -187,7 +187,7 @@ void find_visitor_external_iterator_bench(size_t N)
 
   auto build_end = steady_clock::now();
 
-  Tree::node_iterator it;
+  Tree::node_iterator_type it;
 
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
