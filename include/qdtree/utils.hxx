@@ -1,7 +1,7 @@
 #ifndef QDTREE_UTILS_HXX
 #define QDTREE_UTILS_HXX
 
-#include "qdtree/utils_def.hxx"
+#include "qdtree/utils_decl.hxx"
 
 #include <algorithm>
 

@@ -10,7 +10,7 @@
 #include "qdtree/infix_iterator.hxx"
 
 #include "qdtree/utils.hxx"
-#include "qdtree/qdtree_def.hxx"
+#include "qdtree/qdtree_decl.hxx"
 
 namespace qdtree
 {
