@@ -149,31 +149,45 @@ public:
   using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
   using Queue = std::vector<QueueItem>;
 
-  Queue queue;
   node_type* node;
   coord_type ub, lb, coords;
 
   NodeIterator() {}
 
   NodeIterator(size_t reserve) {
-    queue.reserve(reserve);
+    mQueue.reserve(reserve);
   }
 
   bool loadNext() {
-    if (queue.empty())
+    if (mQueue.empty())
       return false;
 
-    QueueItem& last = queue.back();
+    QueueItem& last = mQueue.back();
     node = std::get<0>(last);
     lb   = std::move(std::get<1>(last));
     ub   = std::move(std::get<2>(last));
 
-    queue.pop_back();
+    mQueue.pop_back();
 
     return true;
   }
 
+  void clearQueue();
+
+  void queue(node_type* root,
+             const coord_type& lb,
+             const coord_type& ub);
+
+  void queue(node_type* node,
+             const coord_type& lb,
+             const coord_type& ub,
+             const coord_type& m,
+             size_t child_index);
   void queueChildren();
+  void queueChildren(size_t first);
+
+private:
+  Queue mQueue;
 };
 
 template <size_t D, typename T, // Same as in Node<D, T>

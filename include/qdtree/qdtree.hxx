@@ -679,13 +679,15 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
                                coord_value_type radius) const
 {
   const T* needle = nullptr;
+
+  if (mRoot == nullptr)
+    return needle;
+
   coord_type search_lb = lowerBound();
   coord_type search_ub = upperBound();
 
-  it.queue.clear();
-  if (mRoot != nullptr) {
-    it.queue.emplace_back(std::make_tuple(mRoot, search_lb, search_ub));
-  }
+  it.clearQueue();
+  it.queue(mRoot, search_lb, search_ub);
 
   if (std::isfinite(radius)) {
     for(size_t i = 0; i < D; ++i) {
@@ -700,9 +702,6 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
   while(it.loadNext()) {
     LOGLN("Visiting " << it.node << ": " << print_extent(it.lb, it.ub));
 
-    if (it.node == nullptr)
-      continue;
-
     // Stop searching if this node can't contain a closer data.
     if (is_outside(it.lb, it.ub, search_lb, search_ub)) {
       LOGLN(it.node << " is outside of " << print_extent(search_lb, search_ub));
@@ -710,12 +709,8 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
     }
 
     if (it.node->data().empty()) { // Bisect the current node.
-      it.queueChildren();
-
-      // Visit the closest octant first.
       size_t closest = get_inner_position(target, middle(it.lb, it.ub)).to_ulong();
-      if (closest != 0)
-        std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
+      it.queueChildren(closest);
     } else { // Visit this point. (Visiting coincident points isn't necessary!)
       coordinates(it.node->data().front(), it.coords);
 
@@ -740,7 +735,7 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
 
       // Cannot find a closer neighbor, skip the rest of the queue.
       if (d2 <= 0)
-        it.queue.clear();
+        it.clearQueue();
     }
   }
 
@@ -778,16 +773,14 @@ template <size_t D, typename T, typename A>
 void QDTree<D, T, A>::accept(visitor_type *visitor,
                              node_iterator_type& iterator) const
 {
-  iterator.queue.clear();
+  if (mRoot == nullptr)
+    return;
 
-  if (mRoot != nullptr) {
-    iterator.queue.emplace_back(mRoot, lowerBound(), upperBound());
-  }
+  iterator.clearQueue();
+
+  iterator.queue(mRoot, lowerBound(), upperBound());
 
   while(iterator.loadNext()) {
-    if (iterator.node == nullptr)
-      continue;
-
     LOGLN("Visiting " << iterator.node << ": " << print_extent(iterator.lb, iterator.ub));
 
     if (!iterator.node->data().empty())
@@ -825,24 +818,71 @@ const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
 
 template <size_t D, typename T, typename C>
 inline void
+NodeIterator<D, T, C>::clearQueue()
+{
+  mQueue.clear();
+}
+
+template <size_t D, typename T, typename C>
+inline void
+NodeIterator<D, T, C>::queue(node_type* root,
+                             const coord_type& lb,
+                             const coord_type& ub)
+{
+  mQueue.emplace_back(std::make_tuple(root, lb, ub));
+}
+
+template <size_t D, typename T, typename C>
+inline void
+NodeIterator<D, T, C>::queue(node_type* node,
+                             const coord_type& lb,
+                             const coord_type& ub,
+                             const coord_type& m,
+                             size_t child_index)
+{
+  mQueue.emplace_back(node, lb, ub);
+  auto& b = mQueue.back();
+  compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
+}
+
+template <size_t D, typename T, typename C>
+inline void
 NodeIterator<D, T, C>::queueChildren()
 {
   const coord_type m = middle(lb, ub);
 
-  size_t child_index = node_type::number_of_children - 1;
+  int child_index = node_type::number_of_children - 1;
   auto child = &(node->children().back());
-  while(true) {
-    queue.emplace_back(*child, lb, ub);
-    auto& b = queue.back();
-    compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
+  while(child_index > 0) {
+    if (*child != nullptr)
+      queue(*child, lb, ub, m, child_index);
 
-    if (child_index == 0)
-      break;
     --child_index;
     --child;
   }
 }
 
+template <size_t D, typename T, typename C>
+inline void
+NodeIterator<D, T, C>::queueChildren(size_t first)
+{
+  const coord_type m = middle(lb, ub);
+
+  int child_index = node_type::number_of_children - 1;
+  auto child = &(node->children().back());
+  while(child_index > 0) {
+    if (*child != nullptr && child_index != first)
+      queue(*child, lb, ub, m, child_index);
+
+    --child_index;
+    --child;
+  }
+
+  child = &(node->children()[first]);
+  if (*child != nullptr) {
+    queue(*child, lb, ub, m, first);
+  }
+}
 
 template <size_t D, typename T, typename C>
 NearestNeighborVisitor<D, T, C>::NearestNeighborVisitor(
@@ -879,12 +919,9 @@ void NearestNeighborVisitor<D, T, C>::visit(
   }
 
   if (it.node->data().empty()) { // Bisect the current node.
-    it.queueChildren();
-
     // Visit the closest octant first.
     size_t closest = get_inner_position(mTarget, middle(it.lb, it.ub)).to_ulong();
-    if (closest != 0)
-      std::swap(it.queue.back(), it.queue[it.queue.size() - 1 - closest]);
+    it.queueChildren(closest);
   } else { // Visit this point. (Visiting coincident points isn't necessary!)
     LOGLN("Visiting point: " << it.coords);
 
@@ -907,7 +944,7 @@ void NearestNeighborVisitor<D, T, C>::visit(
 
     // Cannot find a closer neighbor, skip the rest of the queue.
     if (d2 <= 0)
-      it.queue.clear();
+      it.clearQueue();
   }
 
   return;
