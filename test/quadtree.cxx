@@ -14,6 +14,6 @@ IMPLEMENT_EXTENT_MANIP(double)
 IMPLEMENT_QDTREE(2, Point)
 
 namespace qdtree {
-  template class NodeIterator<2, Point, double>;
-  template class NearestNeighborVisitor<2, Point, double>;
+  template class VisitorView<2, Point, double>;
+  template class ConstNearestNeighborVisitor<2, Point, double>;
 }

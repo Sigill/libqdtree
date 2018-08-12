@@ -146,7 +146,7 @@ void find_external_iterator_bench(size_t N)
 
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
-      auto closest = t.find({(double)x, (double)y}, it);
+      auto closest = static_cast<const Tree&>(t).find({(double)x, (double)y}, it);
       ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
     }
   }
@@ -168,7 +168,7 @@ void find_visitor_bench(size_t N)
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
       Tree::coord_type target = {(double)x, (double)y};
-      auto closest = t.find_visitor(target);
+      auto closest = static_cast<const Tree&>(t).find_visitor(target);
       ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
     }
   }
@@ -192,7 +192,7 @@ void find_visitor_external_iterator_bench(size_t N)
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
       Tree::coord_type target = {(double)x, (double)y};
-      auto closest = t.find_visitor(target, it);
+      auto closest = static_cast<const Tree&>(t).find_visitor(target, it);
       ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
     }
   }

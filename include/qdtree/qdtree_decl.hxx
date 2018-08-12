@@ -86,6 +86,8 @@ public:
 
   Node* lastChild();
 
+  value_list_type& data();
+
   const value_list_type& data() const;
 
   void addData(const T& data);
@@ -137,10 +139,47 @@ template <size_t D, typename T>
 std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m);
 
 
+template <size_t D, typename T, typename C>
+class VisitorView;
 
 template <size_t D, typename T, // Same as in Node<D, T>
           typename C>           // Integral coordinates type
-class NodeIterator
+class ConstVisitorView
+{
+  using UnderlyingView = VisitorView<D, T, C>;
+public:
+  using coord_type = std::array<C, D>;
+  using node_type = Node<D, T>;
+
+public:
+  ConstVisitorView(UnderlyingView &other)
+    : view(other)
+  {}
+
+  void clearQueue();
+  void queueChildren();
+  void queueChildren(size_t first);
+
+  const typename node_type::value_list_type* data() const
+  { return view.data; }
+
+  const coord_type& lb() const
+  { return view.lb; }
+
+  const coord_type& ub() const
+  { return view.ub; }
+
+  const coord_type& coords() const
+  { return view.coords; }
+
+private:
+  UnderlyingView& view;
+};
+
+
+template <size_t D, typename T, // Same as in Node<D, T>
+          typename C>           // Integral coordinates type
+class VisitorView
 {
 public:
   using node_type = Node<D, T>;
@@ -149,12 +188,22 @@ public:
   using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
   using Queue = std::vector<QueueItem>;
 
-  node_type* node;
+  typename node_type::value_list_type *data;
   coord_type ub, lb, coords;
 
-  NodeIterator() {}
+  VisitorView()
+    : data(nullptr)
+    , ub()
+    , lb()
+    , coords()
+    , node(nullptr)
+    , mQueue()
+    , as_const(*this)
+  {}
 
-  NodeIterator(size_t reserve) {
+  VisitorView(size_t reserve)
+    : VisitorView()
+  {
     mQueue.reserve(reserve);
   }
 
@@ -166,6 +215,8 @@ public:
     node = std::get<0>(last);
     lb   = std::move(std::get<1>(last));
     ub   = std::move(std::get<2>(last));
+
+    data = &(node->data());
 
     mQueue.pop_back();
 
@@ -187,32 +238,64 @@ public:
   void queueChildren(size_t first);
 
 private:
+  node_type* node;
   Queue mQueue;
+
+public:
+  ConstVisitorView<D, T, C> as_const;
 };
+
+template <size_t D, typename T, typename C>
+void ConstVisitorView<D, T, C>::clearQueue()
+{
+  view.clearQueue();
+}
+
+template <size_t D, typename T, typename C>
+void ConstVisitorView<D, T, C>::queueChildren()
+{
+  view.queueChildren();
+}
+
+template <size_t D, typename T, typename C>
+void ConstVisitorView<D, T, C>::queueChildren(size_t first)
+{
+  view.queueChildren(first);
+}
 
 template <size_t D, typename T, // Same as in Node<D, T>
           typename C>           // Integral coordinates type
 class Visitor {
 public:
-  using node_iterator = NodeIterator<D, T, C>;
+  using view_type = VisitorView<D, T, C>;
 
-  virtual void visit(node_iterator& it) = 0;
+  virtual void visit(view_type& it) = 0;
+};
+
+template <size_t D, typename T, // Same as in Node<D, T>
+          typename C>           // Integral coordinates type
+class ConstVisitor {
+public:
+  using view_type = ConstVisitorView<D, T, C>;
+
+  virtual void visit(view_type& it) = 0;
 };
 
 template <size_t D, typename T, typename C>
-class NearestNeighborVisitor : public Visitor<D, T, C>
+class ConstNearestNeighborVisitor : public ConstVisitor<D, T, C>
 {
 public:
-  using typename NearestNeighborVisitor::Visitor::node_iterator;
-  using node_type = typename node_iterator::node_type;
-  using value_type = typename node_iterator::node_type::value_type;
-  using coord_type = typename node_iterator::coord_type;
+  using typename ConstNearestNeighborVisitor::ConstVisitor::view_type;
+  using node_type = typename view_type::node_type;
+  using value_type = typename view_type::node_type::value_type;
+  using coord_type = typename view_type::coord_type;
   using coord_value_type = typename coord_type::value_type;
 
-  NearestNeighborVisitor(const coord_type& target,
-                         coord_value_type radius = std::numeric_limits<coord_value_type>::max());
+  ConstNearestNeighborVisitor(const coord_type& target, coord_value_type radius);
 
-  void visit(node_iterator& it) override;
+  ConstNearestNeighborVisitor(const coord_type& target);
+
+  void visit(view_type& it) override;
 
   const value_type* getNearestNeighbor() const;
 
@@ -221,6 +304,27 @@ private:
   coord_value_type mRadius;
   coord_type mSearchLb, mSearchUb;
   const value_type* mNearestNeighbor;
+};
+
+template <size_t D, typename T, typename C>
+class NearestNeighborVisitor : public Visitor<D, T, C>
+{
+public:
+  using typename NearestNeighborVisitor::Visitor::view_type;
+  using node_type = typename view_type::node_type;
+  using value_type = typename view_type::node_type::value_type;
+  using coord_type = typename view_type::coord_type;
+  using coord_value_type = typename coord_type::value_type;
+
+  NearestNeighborVisitor(const coord_type& target,
+                         coord_value_type radius = std::numeric_limits<coord_value_type>::max());
+
+  void visit(view_type& it) override;
+
+  value_type* getNearestNeighbor() const;
+
+private:
+  ConstNearestNeighborVisitor<D, T, C> mImpl;
 };
 
 
@@ -235,8 +339,9 @@ public:
   using coord_value_type = typename A::value_type;
   using coord_type = std::array<coord_value_type, D>;
   using extent_type = std::pair<coord_type, coord_type>;
-  using node_iterator_type = NodeIterator<D, T, coord_value_type>;
+  using node_iterator_type = VisitorView<D, T, coord_value_type>;
   using visitor_type = Visitor<D, T, coord_value_type>;
+  using const_visitor_type = ConstVisitor<D, T, coord_value_type>;
 
   static constexpr size_t dimension = D;
 
@@ -275,6 +380,7 @@ public:
 
   void remove(const T& data);
 
+
   const T* find(const coord_type& target,
                 node_iterator_type& iterator,
                 coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
@@ -289,10 +395,17 @@ public:
   T* find(const coord_type& target,
           coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
-  void accept(visitor_type* visitor,
+
+  void accept(const_visitor_type* visitor,
               node_iterator_type& iterator) const;
 
-  void accept(visitor_type* visitor) const;
+  void accept(const_visitor_type* visitor) const;
+
+  void accept(visitor_type* visitor,
+              node_iterator_type& iterator);
+
+  void accept(visitor_type* visitor);
+
 
   const T* find_visitor(const coord_type& target,
                         node_iterator_type& iterator,
@@ -300,6 +413,13 @@ public:
 
   const T* find_visitor(const coord_type& target,
                         coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+
+  T* find_visitor(const coord_type& target,
+                  node_iterator_type& iterator,
+                  coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+
+  T* find_visitor(const coord_type& target,
+                  coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
 private:
   void add(const T& data, const coord_type &coord);

@@ -164,7 +164,7 @@ void pointer_bench(size_t N) {
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  auto n = t.find({double(N-1), double(N-1)});
+  const Point **n = t.find({double(N-1), double(N-1)});
   ensure(n != nullptr && *n == &points.back());
 
   //(*n)->setX(42);

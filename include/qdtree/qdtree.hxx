@@ -278,6 +278,11 @@ inline const std::list<T> &Node<D, T>::data() const {
 }
 
 template <size_t D, typename T>
+inline std::list<T> &Node<D, T>::data() {
+  return mData;
+}
+
+template <size_t D, typename T>
 void Node<D, T>::addData(const T &data) {
   mData.push_back(data);
 }
@@ -704,15 +709,15 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
 
     // Stop searching if this node can't contain a closer data.
     if (is_outside(it.lb, it.ub, search_lb, search_ub)) {
-      LOGLN(it.node << " is outside of " << print_extent(search_lb, search_ub));
+      LOGLN(print_extent(it.lb, it.ub) << " is outside of " << print_extent(search_lb, search_ub));
       continue;
     }
 
-    if (it.node->data().empty()) { // Bisect the current node.
+    if (it.data->empty()) { // Bisect the current node.
       size_t closest = get_inner_position(target, middle(it.lb, it.ub)).to_ulong();
       it.queueChildren(closest);
     } else { // Visit this point. (Visiting coincident points isn't necessary!)
-      coordinates(it.node->data().front(), it.coords);
+      coordinates(it.data->front(), it.coords);
 
       LOGLN("Visiting point: " << it.coords);
 
@@ -730,7 +735,7 @@ const T* QDTree<D, T, A>::find(const coord_type& target,
           search_ub[i] = target[i] + d;
         }
         LOGLN("Search extent updated: " << print_extent(search_lb, search_ub));
-        needle = &(it.node->data().front());
+        needle = &(it.data->front());
       }
 
       // Cannot find a closer neighbor, skip the rest of the queue.
@@ -769,8 +774,9 @@ T* QDTree<D, T, A>::find(const coord_type& target,
         );
 }
 
+
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::accept(visitor_type *visitor,
+void QDTree<D, T, A>::accept(const_visitor_type *visitor,
                              node_iterator_type& iterator) const
 {
   if (mRoot == nullptr)
@@ -781,28 +787,57 @@ void QDTree<D, T, A>::accept(visitor_type *visitor,
   iterator.queue(mRoot, lowerBound(), upperBound());
 
   while(iterator.loadNext()) {
-    LOGLN("Visiting " << iterator.node << ": " << print_extent(iterator.lb, iterator.ub));
+    LOGLN("Visiting " << ": " << print_extent(iterator.lb, iterator.ub));
 
-    if (!iterator.node->data().empty())
-      coordinates(iterator.node->data().front(), iterator.coords);
+    if (!iterator.data->empty())
+      coordinates(iterator.data->front(), iterator.coords);
+
+    visitor->visit(iterator.as_const);
+  }
+}
+
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::accept(const_visitor_type *visitor) const
+{
+  node_iterator_type iterator(node_type::number_of_children * 8);
+  accept(visitor, iterator);
+}
+
+template <size_t D, typename T, typename A>
+void QDTree<D, T, A>::accept(visitor_type *visitor,
+                             node_iterator_type& iterator)
+{
+  if (mRoot == nullptr)
+    return;
+
+  iterator.clearQueue();
+
+  iterator.queue(mRoot, lowerBound(), upperBound());
+
+  while(iterator.loadNext()) {
+    LOGLN("Visiting " << ": " << print_extent(iterator.lb, iterator.ub));
+
+    if (!iterator.data->empty())
+      coordinates(iterator.data->front(), iterator.coords);
 
     visitor->visit(iterator);
   }
 }
 
 template <size_t D, typename T, typename A>
-void QDTree<D, T, A>::accept(visitor_type *visitor) const
+void QDTree<D, T, A>::accept(visitor_type *visitor)
 {
   node_iterator_type iterator(node_type::number_of_children * 8);
-  return accept(visitor, iterator);
+  accept(visitor, iterator);
 }
+
 
 template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
                                        node_iterator_type& iterator,
                                        coord_value_type radius) const
 {
-  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  ConstNearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
   accept(&visitor, iterator);
   return visitor.getNearestNeighbor();
 }
@@ -811,21 +846,41 @@ template <size_t D, typename T, typename A>
 const T* QDTree<D, T, A>::find_visitor(const coord_type& target,
                                        coord_value_type radius) const
 {
+  ConstNearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  accept(&visitor);
+  return visitor.getNearestNeighbor();
+}
+
+template <size_t D, typename T, typename A>
+T* QDTree<D, T, A>::find_visitor(const coord_type& target,
+                                 node_iterator_type& iterator,
+                                 coord_value_type radius)
+{
+  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  accept(&visitor, iterator);
+  return visitor.getNearestNeighbor();
+}
+
+template <size_t D, typename T, typename A>
+T* QDTree<D, T, A>::find_visitor(const coord_type& target,
+                                 coord_value_type radius)
+{
   NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
   accept(&visitor);
   return visitor.getNearestNeighbor();
 }
 
+
 template <size_t D, typename T, typename C>
 inline void
-NodeIterator<D, T, C>::clearQueue()
+VisitorView<D, T, C>::clearQueue()
 {
   mQueue.clear();
 }
 
 template <size_t D, typename T, typename C>
 inline void
-NodeIterator<D, T, C>::queue(node_type* root,
+VisitorView<D, T, C>::queue(node_type* root,
                              const coord_type& lb,
                              const coord_type& ub)
 {
@@ -834,7 +889,7 @@ NodeIterator<D, T, C>::queue(node_type* root,
 
 template <size_t D, typename T, typename C>
 inline void
-NodeIterator<D, T, C>::queue(node_type* node,
+VisitorView<D, T, C>::queue(node_type* node,
                              const coord_type& lb,
                              const coord_type& ub,
                              const coord_type& m,
@@ -847,7 +902,7 @@ NodeIterator<D, T, C>::queue(node_type* node,
 
 template <size_t D, typename T, typename C>
 inline void
-NodeIterator<D, T, C>::queueChildren()
+VisitorView<D, T, C>::queueChildren()
 {
   const coord_type m = middle(lb, ub);
 
@@ -864,7 +919,7 @@ NodeIterator<D, T, C>::queueChildren()
 
 template <size_t D, typename T, typename C>
 inline void
-NodeIterator<D, T, C>::queueChildren(size_t first)
+VisitorView<D, T, C>::queueChildren(size_t first)
 {
   const coord_type m = middle(lb, ub);
 
@@ -885,49 +940,59 @@ NodeIterator<D, T, C>::queueChildren(size_t first)
 }
 
 template <size_t D, typename T, typename C>
-NearestNeighborVisitor<D, T, C>::NearestNeighborVisitor(
-    const NearestNeighborVisitor<D, T, C>::coord_type& target,
-    NearestNeighborVisitor<D, T, C>::coord_value_type radius)
+inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
+    const coord_type& target,
+    coord_value_type radius)
   : mTarget(target)
   , mRadius(radius)
   , mSearchLb()
   , mSearchUb()
   , mNearestNeighbor(nullptr)
 {
-  for(size_t i = 0; i < D; ++i) {
-    mSearchLb[i] = std::numeric_limits<coord_value_type>::lowest();
-    mSearchUb[i] = std::numeric_limits<coord_value_type>::max();
-  }
-
   if (std::isfinite(mRadius)) {
     for(size_t i = 0; i < D; ++i) {
       mSearchLb[i] = mTarget[i] - mRadius;
       mSearchUb[i] = mTarget[i] + mRadius;
     }
     mRadius *= mRadius;
+  } else {
+    mSearchLb.fill(std::numeric_limits<coord_value_type>::lowest());
+    mSearchUb.fill(std::numeric_limits<coord_value_type>::max());
   }
 }
 
 template <size_t D, typename T, typename C>
-void NearestNeighborVisitor<D, T, C>::visit(
-    typename NearestNeighborVisitor<D, T, C>::node_iterator& it)
+inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
+    const coord_type& target)
+  : mTarget(target)
+  , mRadius(std::numeric_limits<coord_value_type>::max())
+  , mSearchLb()
+  , mSearchUb()
+  , mNearestNeighbor(nullptr)
+{
+  mSearchLb.fill(std::numeric_limits<coord_value_type>::lowest());
+  mSearchUb.fill(std::numeric_limits<coord_value_type>::max());
+}
+
+template <size_t D, typename T, typename C>
+void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
 {
   // Stop searching if this node can't contain a closer data.
-  if (is_outside(it.lb, it.ub, mSearchLb, mSearchUb)) {
-    LOGLN(it.node << " is outside of " << print_extent(mSearchLb, mSearchUb));
+  if (is_outside(it.lb(), it.ub(), mSearchLb, mSearchUb)) {
+    LOGLN(print_extent(it.lb(), it.ub()) << " is outside of " << print_extent(mSearchLb, mSearchUb));
     return;
   }
 
-  if (it.node->data().empty()) { // Bisect the current node.
+  if (it.data()->empty()) { // Bisect the current node.
     // Visit the closest octant first.
-    size_t closest = get_inner_position(mTarget, middle(it.lb, it.ub)).to_ulong();
+    size_t closest = get_inner_position(mTarget, middle(it.lb(), it.ub())).to_ulong();
     it.queueChildren(closest);
   } else { // Visit this point. (Visiting coincident points isn't necessary!)
-    LOGLN("Visiting point: " << it.coords);
+    LOGLN("Visiting point: " << it.coords());
 
     coord_value_type d2 = 0;
     for(size_t i = 0; i < D; ++i) {
-      coord_value_type d = it.coords[i] - mTarget[i];
+      coord_value_type d = it.coords()[i] - mTarget[i];
       d2 += d*d;
     }
 
@@ -939,7 +1004,7 @@ void NearestNeighborVisitor<D, T, C>::visit(
         mSearchUb[i] = mTarget[i] + d;
       }
       LOGLN("Search extent updated: " << print_extent(mSearchLb, mSearchUb));
-      mNearestNeighbor = &(it.node->data().front());
+      mNearestNeighbor = &(it.data()->front());
     }
 
     // Cannot find a closer neighbor, skip the rest of the queue.
@@ -951,10 +1016,30 @@ void NearestNeighborVisitor<D, T, C>::visit(
 }
 
 template <size_t D, typename T, typename C>
-const typename NearestNeighborVisitor<D, T, C>::value_type*
-NearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
+const typename ConstNearestNeighborVisitor<D, T, C>::value_type*
+ConstNearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
 {
   return mNearestNeighbor;
+}
+
+template <size_t D, typename T, typename C>
+NearestNeighborVisitor<D, T, C>::NearestNeighborVisitor(
+    const coord_type& target,
+    coord_value_type radius)
+  : mImpl(target, radius) {}
+
+
+template <size_t D, typename T, typename C>
+void NearestNeighborVisitor<D, T, C>::visit(view_type& it)
+{
+  mImpl.visit(it.as_const);
+}
+
+template <size_t D, typename T, typename C>
+typename NearestNeighborVisitor<D, T, C>::value_type*
+NearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
+{
+  return const_cast<T*>(mImpl.getNearestNeighbor());
 }
 
 template <size_t D, typename T, typename A>

@@ -490,11 +490,11 @@ TEST(QDTree, find)
 
 template <size_t D, typename T, typename C>
 class TracedNearestNeighborVisitor
-    : public qdtree::NearestNeighborVisitor<D, T, C>
+    : public qdtree::ConstNearestNeighborVisitor<D, T, C>
 {
 public:
-  using Base = typename TracedNearestNeighborVisitor::NearestNeighborVisitor;
-  using typename Base::node_iterator;
+  using Base = typename TracedNearestNeighborVisitor::ConstNearestNeighborVisitor;
+  using typename Base::view_type;
   using typename Base::coord_type;
   using typename Base::coord_value_type;
   using visited_nodes_type = std::vector<std::pair<coord_type, coord_type>>;
@@ -504,8 +504,8 @@ public:
     : Base(target, radius)
   {}
 
-  void visit(node_iterator& it) override {
-    mVisitedNodes.emplace_back(it.lb, it.ub);
+  void visit(view_type& it) override {
+    mVisitedNodes.emplace_back(it.lb(), it.ub());
     Base::visit(it);
   }
 
