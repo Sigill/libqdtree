@@ -49,24 +49,22 @@ public:
 
   Node(size_t i, Node* child);
 
-private:
   /**
    * @brief Constructor used by the copy constructor to perform a deep copy.
    *
-   * This constructor only copy data. Children are handled by the deep copy
-   * constructor.
-   *
-   * \sa Node(const Node&)
+   * This constructor only copy data. Children are handled separately.
    */
   explicit Node(const value_list_type& otherData);
 
-public:
-  /**
-   * @brief Perform a deep copy.
-   */
-  Node(const Node& other);
-
   Node* child(size_t i) const;
+
+  /**
+   * @brief Destructor.
+   *
+   * This destructor does process the children.
+   * They must be deleted using QDTree::destroy_node().
+   */
+  ~Node() = default;
 
   bool leaf() const;
 
@@ -74,9 +72,9 @@ public:
 
   bool has_siblings(size_t j) const;
 
-  Node* addChild(size_t i);
+  void addChild(size_t i, Node* n);
 
-  void removeChild(size_t i);
+  Node *removeChild(size_t i);
 
   void truncate();
 
@@ -93,30 +91,6 @@ public:
   void addData(const T& data);
 
   bool removeData(const T& data);
-
-  /**
-   * @brief Delete \p node and every children below.
-   *
-   * We could let the delete operator delete all of its children,
-   * but that process would be recursive. This method flatten the
-   * whole tree in order to delete everything iteratively.
-   *
-   * @param node The node to delete.
-   */
-  static void destroy(Node* node);
-
-private:
-  /**
-   * @brief Destructor.
-   *
-   * This destructor is private because it shall not be used directly.
-   * Use destroy() instead to properly delete a node and all of its children.
-   * Since destroy() takes care of deleting every children of a node,
-   * this destructor only have to release the memory by the node.
-   *
-   * \sa destroy()
-   */
-  ~Node() = default;
 
 protected:
   child_list_type mChildren;
@@ -330,12 +304,15 @@ private:
 
 template <size_t D,   // Dimension
           typename T, // Point type
-          typename A = BraketAccessor<T, double>>
+          typename A = BraketAccessor<T, double>,
+          typename Allocator = std::allocator<Node<D, T>>>
 class QDTree
 {
 public:
   using value_type = T;
   using node_type = Node<D, T>;
+  using allocator_type = Allocator;
+  using allocator_traits = std::allocator_traits<allocator_type>;
   using coord_value_type = typename A::value_type;
   using coord_type = std::array<coord_value_type, D>;
   using extent_type = std::pair<coord_type, coord_type>;
@@ -346,14 +323,20 @@ public:
   static constexpr size_t dimension = D;
 
 protected:
+  allocator_type mAllocator;
   A mCoordinateAccessor;
   coord_type mLb, mUb;
   node_type* mRoot;
 
 public:
-  QDTree();
+  // Allocator support in constructors and assignment operators is inspired by:
+  // https://stackoverflow.com/a/21224221
+  // https://en.cppreference.com/w/cpp/named_req/AllocatorAwareContainer
+  // https://foonathan.net/blog/2015/10/05/allocatorawarecontainer-propagation-pitfalls.html
+  QDTree() noexcept(std::is_nothrow_default_constructible<allocator_type>::value);
+  QDTree(const allocator_type& a);
   QDTree(const QDTree& other);
-  QDTree(QDTree&& other) noexcept;
+  QDTree(QDTree&& other) noexcept(std::is_nothrow_move_constructible<allocator_type>::value);
 
   ~QDTree();
 
@@ -379,6 +362,24 @@ public:
   void unsafe_add(const T& data);
 
   void remove(const T& data);
+
+  node_type* allocate_node();
+  node_type* allocate_node(const typename node_type::value_type& d);
+  node_type* allocate_node(size_t i, node_type* child);
+  node_type* allocate_node(const typename node_type::value_list_type& otherData);
+
+  node_type* clone_node(const node_type& other);
+
+  /**
+   * @brief Delete \p node and every children below.
+   *
+   * We could let the delete operator delete all of its children,
+   * but that process would be recursive. This method flatten the
+   * whole tree in order to delete everything iteratively.
+   *
+   * @param node The node to delete.
+   */
+  void destroy_node(node_type* node);
 
 
   const T* find(const coord_type& target,
@@ -425,8 +426,8 @@ private:
   void add(const T& data, const coord_type &coord);
 };
 
-template <size_t D, typename T, typename A>
-std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A>& tree);
+template <size_t D, typename T, typename A, typename Allocator>
+std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A, Allocator>& tree);
 
 } // namespace qdtree
 
