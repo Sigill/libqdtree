@@ -147,19 +147,19 @@ std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m
 }
 
 template <size_t D, typename T>
-Node<D, T>::Node()
+inline Node<D, T>::Node()
   : mChildren{}
   , mData()
 {}
 
 template <size_t D, typename T>
-Node<D, T>::Node(const Node<D, T>::value_type& d)
+inline Node<D, T>::Node(const Node<D, T>::value_type& d)
   : mChildren{}
   , mData(1, d)
 {}
 
 template <size_t D, typename T>
-Node<D, T>::Node(size_t i, Node<D, T>* child)
+inline Node<D, T>::Node(size_t i, Node<D, T>* child)
   : mChildren{}
   , mData()
 {
@@ -167,30 +167,31 @@ Node<D, T>::Node(size_t i, Node<D, T>* child)
 }
 
 template <size_t D, typename T>
-Node<D, T>::Node(const value_list_type& otherData)
+inline Node<D, T>::Node(const value_list_type& otherData)
   : mChildren{}
   , mData(otherData)
 {}
 
 template <size_t D, typename T>
-Node<D, T>* Node<D, T>::child(size_t i) const {
+inline Node<D, T>* Node<D, T>::child(size_t i) const {
   return mChildren[i];
 }
 
 template <size_t D, typename T>
-bool Node<D, T>::leaf() const {
+inline bool Node<D, T>::leaf() const {
   return std::all_of(mChildren.cbegin(),
                      mChildren.cend(),
-                     [](const Node<D, T>* o){ return o == nullptr; });
+                     [](const Node* o){ return o == nullptr; });
 }
 
 template <size_t D, typename T>
-const typename Node<D, T>::child_list_type& Node<D, T>::children() const {
+inline const typename Node<D, T>::child_list_type&
+Node<D, T>::children() const {
   return mChildren;
 }
 
 template <size_t D, typename T>
-bool Node<D, T>::has_siblings(size_t j) const {
+inline bool Node<D, T>::has_siblings(size_t j) const {
   for (size_t i = 0; i < D; ++i) {
     if(i != j && mChildren[i] != nullptr) {
       return true;
@@ -206,7 +207,8 @@ Node<D, T>::addChild(size_t i, Node* n) {
 }
 
 template <size_t D, typename T>
-Node<D, T>* Node<D, T>::removeChild(size_t i) {
+inline Node<D, T>*
+Node<D, T>::removeChild(size_t i) {
   Node* n = mChildren[i];
   mChildren[i] = nullptr;
   return n;
@@ -218,13 +220,14 @@ inline void Node<D, T>::truncate() {
 }
 
 template <size_t D, typename T>
-void Node<D, T>::setChild(size_t i, Node<D, T>* child) {
+inline void Node<D, T>::setChild(size_t i, Node<D, T>* child) {
   mChildren[i] = child;
 }
 
 template <size_t D, typename T>
-Node<D, T>* Node<D, T>::firstChild() {
-  for(Node<D, T>* child : mChildren) {
+inline Node<D, T>*
+Node<D, T>::firstChild() {
+  for(Node* child : mChildren) {
     if (child != nullptr) {
       return child;
     }
@@ -234,7 +237,8 @@ Node<D, T>* Node<D, T>::firstChild() {
 }
 
 template <size_t D, typename T>
-Node<D, T>* Node<D, T>::lastChild() {
+inline Node<D, T>*
+Node<D, T>::lastChild() {
   for(auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
     if (*it) {
       return *it;
@@ -245,12 +249,12 @@ Node<D, T>* Node<D, T>::lastChild() {
 }
 
 template <size_t D, typename T>
-inline const std::list<T> &Node<D, T>::data() const {
+inline const std::list<T>& Node<D, T>::data() const {
   return mData;
 }
 
 template <size_t D, typename T>
-inline std::list<T> &Node<D, T>::data() {
+inline std::list<T>& Node<D, T>::data() {
   return mData;
 }
 
@@ -260,7 +264,7 @@ void Node<D, T>::addData(const T &data) {
 }
 
 template <size_t D, typename T>
-bool Node<D, T>::removeData(const T& data) {
+inline bool Node<D, T>::removeData(const T& data) {
   auto it = std::find(mData.cbegin(), mData.cend(), data);
   if (it != mData.cend()) {
     mData.erase(it);
@@ -268,6 +272,7 @@ bool Node<D, T>::removeData(const T& data) {
   }
   return false;
 }
+
 
 template <size_t D, typename T, typename A, typename Allocator>
 QDTree<D, T, A, Allocator>::QDTree()
