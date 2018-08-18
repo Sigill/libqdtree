@@ -311,6 +311,7 @@ class QDTree
 public:
   using value_type = T;
   using node_type = Node<D, T>;
+  using accessor_type = A;
   using allocator_type = Allocator;
   using allocator_traits = std::allocator_traits<allocator_type>;
   using coord_value_type = typename A::value_type;
@@ -324,7 +325,7 @@ public:
 
 protected:
   allocator_type mAllocator;
-  A mCoordinateAccessor;
+  accessor_type mCoordinateAccessor;
   coord_type mLb, mUb;
   node_type* mRoot;
 
