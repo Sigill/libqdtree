@@ -3,6 +3,8 @@ project(QDTree)
 
 set(QDTREE_VERSION "0.1.0")
 
+SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
+
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
