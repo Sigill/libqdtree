@@ -78,18 +78,8 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(GTest REQUIRED)
   find_package(GMock REQUIRED)
-  enable_testing()
-
-  add_library(quadtree STATIC test/quadtree.cxx)
-  target_include_directories(quadtree PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/test)
-  target_link_libraries(quadtree PRIVATE qdtree)
-
-  add_executable(unit-tests test/unit-tests.cxx)
-  target_link_libraries(unit-tests
-    PRIVATE quadtree ${GMOCK_MAIN_LIBRARIES} Threads::Threads)
-  gtest_add_tests(unit-tests "" AUTO)
-
   find_package(Boost COMPONENTS program_options REQUIRED)
+  find_package(foonathan_memory REQUIRED)
 
   include(ExternalProject)
 
@@ -112,11 +102,33 @@ if(BUILD_TESTING)
     INTERFACE_INCLUDE_DIRECTORIES ${RANG_INCLUDE_DIR})
   add_dependencies(rang rang_external)
 
+
+  enable_testing()
+
+
+  add_library(quadtree STATIC test/quadtree.cxx)
+  target_include_directories(quadtree PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/test)
+  target_link_libraries(quadtree PRIVATE qdtree)
+
+  add_executable(unit-tests test/unit-tests.cxx)
+  target_link_libraries(unit-tests
+    PRIVATE quadtree ${GMOCK_MAIN_LIBRARIES} Threads::Threads)
+  gtest_add_tests(unit-tests "" AUTO)
+
+  add_executable(unit-tests-custom-allocator test/unit-tests-custom-allocator.cxx)
+  target_link_libraries(unit-tests-custom-allocator
+    PRIVATE qdtree
+            ${GMOCK_MAIN_LIBRARIES}
+            Threads::Threads
+            foonathan_memory)
+  gtest_add_tests(unit-tests-custom-allocator "" AUTO)
+
   add_executable(benchmark test/benchmark.cxx)
   target_link_libraries(benchmark
     PRIVATE quadtree ${Boost_LIBRARIES} rang)
 
   add_executable(benchmark2 test/benchmark2.cxx)
+  target_include_directories(benchmark2 PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(benchmark2
-    PRIVATE qdtree ${Boost_LIBRARIES} rang)
+    PRIVATE qdtree ${Boost_LIBRARIES} rang foonathan_memory)
 endif()
