@@ -3,13 +3,17 @@
 #include "quadtree.hxx"
 #include "qdtree/qdtree.hxx"
 
-std::ostream& operator<<(std::ostream& out, const Point& p) {
+namespace std {
+inline std::ostream& operator<<(std::ostream& out, const Point& p) {
   return out << qdtree::print_coords(p);
 }
+}
 
-IMPLEMENT_COORDS_MANIP(double)
+INSTANTIATE_COORDS_MANIP(double)
+INSTANTIATE_COORDS_MANIP_HELPER(double, 2)
 
-IMPLEMENT_EXTENT_MANIP(double)
+INSTANTIATE_EXTENT_MANIP(double)
+INSTANTIATE_EXTEND_MANIP_HELPER(double, 2)
 
 IMPLEMENT_QDTREE(2, Point)
 

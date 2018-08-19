@@ -16,6 +16,10 @@
 namespace qdtree
 {
 
+// Those logging methods are used to print all sort of info related to
+// coordinates, pointers... The only thing that might not be printable out of
+// the box is QDTree::value_type. An operator<< for value_type has to be
+// defined either in value_type's namespace or the qdtree namespace.
 #ifdef HAS_INSTR
 #define LOG(x) std::cout << x << std::flush;
 #define LOGLN(x) LOG(x << "\n")
@@ -803,7 +807,7 @@ QDTree<D, T, A, Allocator>::find(
   LOGLN("Search extent: " << print_extent(search_lb, search_ub));
 
   while(it.loadNext()) {
-    LOGLN("Visiting " << it.node << ": " << print_extent(it.lb, it.ub));
+    LOGLN("Visiting " << it.node() << ": " << print_extent(it.lb, it.ub));
 
     // Stop searching if this node can't contain a closer data.
     if (is_outside(it.lb, it.ub, search_lb, search_ub)) {
@@ -817,7 +821,7 @@ QDTree<D, T, A, Allocator>::find(
     } else { // Visit this point. (Visiting coincident points isn't necessary!)
       coordinates(it.data->front(), it.coords);
 
-      LOGLN("Visiting point: " << it.coords);
+      LOGLN("Visiting point: " << print_coords(it.coords));
 
       coord_value_type d2 = 0;
       for(size_t i = 0; i < D; ++i) {
@@ -893,7 +897,7 @@ QDTree<D, T, A, Allocator>::accept(
   iterator.queue(mRoot, lowerBound(), upperBound());
 
   while(iterator.loadNext()) {
-    LOGLN("Visiting " << ": " << print_extent(iterator.lb, iterator.ub));
+    LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb, iterator.ub));
 
     if (!iterator.data->empty())
       coordinates(iterator.data->front(), iterator.coords);
@@ -924,7 +928,7 @@ QDTree<D, T, A, Allocator>::accept(
   iterator.queue(mRoot, lowerBound(), upperBound());
 
   while(iterator.loadNext()) {
-    LOGLN("Visiting " << ": " << print_extent(iterator.lb, iterator.ub));
+    LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb, iterator.ub));
 
     if (!iterator.data->empty())
       coordinates(iterator.data->front(), iterator.coords);
@@ -1026,7 +1030,7 @@ VisitorView<D, T, C>::queueChildren()
   const coord_type m = middle(lb, ub);
 
   int child_index = node_type::number_of_children - 1;
-  auto child = &(node->children().back());
+  auto child = &(mNode->children().back());
   while(child_index > 0) {
     if (*child != nullptr)
       queue(*child, lb, ub, m, child_index);
@@ -1043,7 +1047,7 @@ VisitorView<D, T, C>::queueChildren(size_t first)
   const coord_type m = middle(lb, ub);
 
   int child_index = node_type::number_of_children - 1;
-  auto child = &(node->children().back());
+  auto child = &(mNode->children().back());
   while(child_index > 0) {
     if (*child != nullptr && child_index != first)
       queue(*child, lb, ub, m, child_index);
@@ -1052,10 +1056,16 @@ VisitorView<D, T, C>::queueChildren(size_t first)
     --child;
   }
 
-  child = &(node->children()[first]);
+  child = &(mNode->children()[first]);
   if (*child != nullptr) {
     queue(*child, lb, ub, m, first);
   }
+}
+
+template <size_t D, typename T, typename C>
+inline const Node<D, T>* VisitorView<D, T, C>::node() const
+{
+  return mNode;
 }
 
 template <size_t D, typename T, typename C>
@@ -1107,7 +1117,7 @@ void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
     size_t closest = get_inner_position(mTarget, middle(it.lb(), it.ub())).to_ulong();
     it.queueChildren(closest);
   } else { // Visit this point. (Visiting coincident points isn't necessary!)
-    LOGLN("Visiting point: " << it.coords());
+    LOGLN("Visiting point: " << print_coords(it.coords()));
 
     coord_value_type d2 = 0;
     for(size_t i = 0; i < D; ++i) {

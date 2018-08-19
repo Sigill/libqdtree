@@ -170,7 +170,7 @@ public:
     , ub()
     , lb()
     , coords()
-    , node(nullptr)
+    , mNode(nullptr)
     , mQueue()
     , as_const(*this)
   {}
@@ -186,11 +186,11 @@ public:
       return false;
 
     QueueItem& last = mQueue.back();
-    node = std::get<0>(last);
+    mNode = std::get<0>(last);
     lb   = std::move(std::get<1>(last));
     ub   = std::move(std::get<2>(last));
 
-    data = &(node->data());
+    data = &(mNode->data());
 
     mQueue.pop_back();
 
@@ -203,7 +203,7 @@ public:
              const coord_type& lb,
              const coord_type& ub);
 
-  void queue(node_type* node,
+  void queue(node_type* mNode,
              const coord_type& lb,
              const coord_type& ub,
              const coord_type& m,
@@ -211,8 +211,10 @@ public:
   void queueChildren();
   void queueChildren(size_t first);
 
+  const node_type* node() const;
+
 private:
-  node_type* node;
+  node_type* mNode;
   Queue mQueue;
 
 public:

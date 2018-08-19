@@ -38,6 +38,8 @@ void _ensure(const char* expression, const char* file, int line)
 
 #define ensure(EXPRESSION) ((EXPRESSION) ? (void)0 : _ensure(#EXPRESSION, __FILE__, __LINE__))
 
+namespace my
+{
 class Point {
 public:
   Point(double x, double y)
@@ -56,13 +58,18 @@ private:
   bool mTouched;
 };
 
+std::ostream& operator<<(std::ostream& out, const Point& p) {
+  return out << "(" << p.x() << "; " << p.y() << ")";
+}
+
 bool operator==(const Point& lhs, const Point& rhs) {
   return lhs.x() == rhs.x() && lhs.y() == rhs.y();
 }
+} // namespace my
 
 struct XYPointerAccessor {
   using value_type = double;
-  value_type operator()(const Point* p, const size_t i) const
+  value_type operator()(const my::Point* p, const size_t i) const
   {
     if (i == 0) return p->x();
     else return p->y();
@@ -71,22 +78,22 @@ struct XYPointerAccessor {
 
 struct XYRefAccessor {
   using value_type = double;
-  value_type operator()(const Point& p, const size_t i) const
+  value_type operator()(const my::Point& p, const size_t i) const
   {
     if (i == 0) return p.x();
     else return p.y();
   }
 };
 
-using VTree = qdtree::QDTree<2, Point, XYRefAccessor>;
-using RTree = qdtree::QDTree<2, std::reference_wrapper<Point>, XYRefAccessor>;
-using PTree = qdtree::QDTree<2, const Point *, XYPointerAccessor>;
+using VTree = qdtree::QDTree<2, my::Point, XYRefAccessor>;
+using RTree = qdtree::QDTree<2, std::reference_wrapper<my::Point>, XYRefAccessor>;
+using PTree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor>;
 
 using FPAllocator = foonathan::memory::std_allocator<
   PTree::node_type,
   foonathan::memory::memory_pool<>>;
 
-using PFATree = qdtree::QDTree<2, const Point *, XYPointerAccessor, FPAllocator>;
+using PFATree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor, FPAllocator>;
 
 using BPAllocator =  boost::fast_pool_allocator<
     PTree::node_type,
@@ -94,7 +101,7 @@ using BPAllocator =  boost::fast_pool_allocator<
     boost::details::pool::default_mutex
 >;
 
-using PBATree = qdtree::QDTree<2, const Point *, XYPointerAccessor, BPAllocator>;
+using PBATree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor, BPAllocator>;
 
 template<typename T>
 T make_tree(size_t N) {
@@ -104,8 +111,8 @@ T make_tree(size_t N) {
   return t;
 }
 
-std::vector<Point> make_points(size_t N) {
-  std::vector<Point> points;
+std::vector<my::Point> make_points(size_t N) {
+  std::vector<my::Point> points;
   points.reserve(N*N);
 
   for(size_t y = 0; y < N; ++y)
@@ -122,20 +129,20 @@ void value_bench(size_t N) {
 
   VTree t = make_tree<VTree>(N);
 
-  for(const Point& p : points)
+  for(const my::Point& p : points)
     t.unsafe_add(p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
-    Point* n = t.find({double(N-1), double(N-1)});
-    ensure(n != nullptr && *n == Point({double(N-1), double(N-1)}));
+    my::Point* n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && *n == my::Point({double(N-1), double(N-1)}));
     n->touch();
   }
 
   {
-    const Point* n = static_cast<const VTree&>(t).find({0.0, 0.0});
-    ensure(n != nullptr && *n == Point({0.0, 0.0}));
+    const my::Point* n = static_cast<const VTree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && *n == my::Point({0.0, 0.0}));
     // Compile error, n is a pointer to a _constant Point_.
     //n->touch();
   }
@@ -148,7 +155,7 @@ void reference_bench(size_t N) {
 
   RTree t = make_tree<RTree>(N);
 
-  for(Point& p : points)
+  for(my::Point& p : points)
     t.unsafe_add(p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
@@ -162,7 +169,7 @@ void reference_bench(size_t N) {
 
   {
     auto n = static_cast<const RTree&>(t).find({0.0, 0.0});
-    ensure(n != nullptr && n->get() == Point({0.0, 0.0}));
+    ensure(n != nullptr && n->get() == my::Point({0.0, 0.0}));
     n->get().touch();
     // Compile error, n is a pointer to a _constant reference_wrapper_.
     //*n = points.front();
@@ -179,12 +186,12 @@ void pointer_bench(size_t N) {
 
   PTree t = make_tree<PTree>(N);
 
-  for(Point& p : points)
+  for(my::Point& p : points)
     t.unsafe_add(&p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const Point **n = t.find({double(N-1), double(N-1)});
+  const my::Point **n = t.find({double(N-1), double(N-1)});
   ensure(n != nullptr && *n == &points.back());
 
   //(*n)->setX(42);
@@ -203,12 +210,12 @@ void pointer_allocator_bench(size_t N) {
   t.cover({0.0, 0.0});
   t.cover({double(N), double(N)});
 
-  for(Point& p : points)
+  for(my::Point& p : points)
     t.unsafe_add(&p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const Point **n = t.find({double(N-1), double(N-1)});
+  const my::Point **n = t.find({double(N-1), double(N-1)});
   ensure(n != nullptr && *n == &points.back());
 
   //(*n)->setX(42);
@@ -223,12 +230,12 @@ void pointer_boost_allocator_bench(size_t N) {
 
   PBATree t = make_tree<PBATree>(N);
 
-  for(Point& p : points)
+  for(my::Point& p : points)
     t.unsafe_add(&p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const Point **n = t.find({double(N-1), double(N-1)});
+  const my::Point **n = t.find({double(N-1), double(N-1)});
   ensure(n != nullptr && *n == &points.back());
 
   //(*n)->setX(42);

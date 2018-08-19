@@ -11,6 +11,14 @@
 
 using Point = std::array<double, 2>;
 
+// Since Point is effectively in the std namespace, operator<< has to be
+// defined here also.
+namespace std {
+std::ostream& operator<<(std::ostream& out, const Point& p) {
+  return out << "(" << p[0] << "; " << p[1] << ")";
+}
+}
+
 using Accessor = qdtree::BraketAccessor<Point, double>;
 
 using Allocator = foonathan::memory::std_allocator<
@@ -18,10 +26,6 @@ using Allocator = foonathan::memory::std_allocator<
   foonathan::memory::memory_pool<>>;
 
 using Tree = qdtree::QDTree<2, Point, Accessor, Allocator>;
-
-std::ostream& operator<<(std::ostream& out, const Point& p) {
-  return out << qdtree::print_coords(p);
-}
 
 Tree::extent_type extent(const Tree::coord_type& lb,
                          const Tree::coord_type& ub) {

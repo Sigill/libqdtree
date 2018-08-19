@@ -9,51 +9,40 @@ namespace qdtree
 {
 
 template<typename T>
-struct print_coords_manip
+struct print_raw_array_manip
 {
-  const std::vector<T> p;
+  const T *begin, *end;
 
-  template<typename Container>
-  print_coords_manip(Container a)
-    : p(a.begin(), a.end()) {}
+  print_raw_array_manip(const T *begin, const T *end);
 };
 
-template<typename T>
-print_coords_manip<T> print_coords(const std::initializer_list<T>& a);
-
-template<typename Container>
-print_coords_manip<typename Container::value_type> print_coords(const Container& a)
-{
-  return print_coords_manip<typename Container::value_type>(a);
-}
+template<typename T, size_t S>
+print_raw_array_manip<T>
+print_coords(const std::array<T, S>& a);
 
 template<typename T>
-std::ostream& operator<<(std::ostream& out, const print_coords_manip<T>& m);
+std::ostream& operator<<(std::ostream& out,
+                         const print_raw_array_manip<T>& m);
 
 
 
 template<typename T>
 struct print_extent_manip
 {
-  const std::vector<T> a, b;
+  const print_raw_array_manip<T> ul, br;
 
-  template<typename Container>
-  print_extent_manip(const Container& a,
-                     const Container& b)
-    : a(a.cbegin(), a.cend())
-    , b(b.cbegin(), b.cend())
-  {}
+  print_extent_manip(const T *ulBegin, const T *ulEnd,
+                     const T *brBegin, const T *brEnd);
 };
 
-template<typename Container>
-print_extent_manip<typename Container::value_type>
-print_extent(const Container& a, const Container& b)
-{
-  return print_extent_manip<typename Container::value_type>(a, b);
-}
+template<typename T, size_t S>
+print_extent_manip<T>
+print_extent(const std::array<T, S>& a,
+             const std::array<T, S>& b);
 
 template<typename T>
-std::ostream& operator<<(std::ostream& out, const print_extent_manip<T>& m);
+std::ostream& operator<<(std::ostream& out,
+                         const print_extent_manip<T>& m);
 
 
 
