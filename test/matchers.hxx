@@ -71,7 +71,7 @@ public:
       }
     }
 
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < (1 << D); ++i) {
       auto matcher = matchers.find(i);
 
       if (matcher == matchers.cend()) {
@@ -103,7 +103,7 @@ public:
         *os << std::regex_replace(ss.str(), std::regex("\n"), "\n ");
       }
 
-      if (matchers.size() != D) {
+      if (matchers.size() != (1 << D)) {
         *os << "\nand all other children are NULL";
       }
     }
@@ -135,7 +135,7 @@ public:
       return false;
     }
 
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < (1 << D); ++i) {
       if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;
@@ -174,7 +174,7 @@ public:
       return false;
     }
 
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < (1 << D); ++i) {
       if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;

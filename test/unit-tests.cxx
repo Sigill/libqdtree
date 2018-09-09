@@ -59,9 +59,7 @@ TEST(QDTree, cover_wrap)
   EXPECT_THAT(t, Root(ChildrenMatch({
                                       {2, ChildrenMatch({
                                          {2, ChildrenMatch({
-                                            {2, ChildrenMatch({
-                                               {0, PointsAre({0.0, 0.0})}})
-                                            }})
+                                            {2, PointsAre({0.0, 0.0})}})
                                          }})
                                       }})));
 }
