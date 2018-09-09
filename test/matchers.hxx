@@ -14,10 +14,10 @@ namespace testing {
 
 using namespace ::testing;
 
-template <size_t D, typename T, typename Ac, typename Al>
-class RootMatcher : public MatcherInterface<const ::qdtree::QDTree<D, T, Ac, Al>&> {
+template <typename Q>
+class RootMatcher : public MatcherInterface<const Q&> {
 public:
-  using tree_type = ::qdtree::QDTree<D, T, Ac, Al>;
+  using tree_type = Q;
   using node_type = typename tree_type::node_type;
 
   RootMatcher(const Matcher<const node_type*>& matcher)
@@ -40,20 +40,21 @@ private:
   const Matcher<const node_type*> matcher;
 };
 
-template <size_t D, typename T, typename Ac, typename Al>
-Matcher<const ::qdtree::QDTree<D, T, Ac, Al>&> Root(const Matcher<const ::qdtree::Node<D, T>*>& matcher) {
-  return MakeMatcher(new RootMatcher<D, T, Ac, Al>(matcher));
+template <typename Q>
+Matcher<const Q&> Root(
+    const Matcher<const typename Q::node_type*>& matcher) {
+  return MakeMatcher(new RootMatcher<Q>(matcher));
 }
 
 
-template<size_t D, typename T>
-using NodeMatcherMap = std::map<size_t, Matcher<const ::qdtree::Node<D, T>*>>;
+template<typename N>
+using NodeMatcherMap = std::map<size_t, Matcher<const N*>>;
 
-template <size_t D, typename T>
-class ChildrenMatcher : public MatcherInterface<const ::qdtree::Node<D, T>*> {
+template <typename N>
+class ChildrenMatcher : public MatcherInterface<const N*> {
 public:
-  using node_type = ::qdtree::Node<D, T>;
-  using matcher_map_type = NodeMatcherMap<D, T>;
+  using node_type = N;
+  using matcher_map_type = NodeMatcherMap<N>;
 
   ChildrenMatcher(matcher_map_type matchers) : matchers(matchers) {}
 
@@ -65,13 +66,13 @@ public:
 
     for(const auto& p: matchers) {
       size_t i = p.first;
-      if (i < 0 || i >= (1 << D)) {
+      if (i < 0 || i >= node_type::number_of_children) {
         *l << "/Child #" << i << " is invalid (" << i << " is out of range)";
         return false;
       }
     }
 
-    for(size_t i = 0; i < (1 << D); ++i) {
+    for(size_t i = 0; i < node_type::number_of_children; ++i) {
       auto matcher = matchers.find(i);
 
       if (matcher == matchers.cend()) {
@@ -103,7 +104,7 @@ public:
         *os << std::regex_replace(ss.str(), std::regex("\n"), "\n ");
       }
 
-      if (matchers.size() != (1 << D)) {
+      if (matchers.size() != node_type::number_of_children) {
         *os << "\nand all other children are NULL";
       }
     }
@@ -116,16 +117,16 @@ private:
   const matcher_map_type matchers;
 };
 
-template <size_t D, typename T>
-Matcher<const ::qdtree::Node<D, T>*> ChildrenMatch(NodeMatcherMap<D, T> matchers) {
-  return MakeMatcher(new ChildrenMatcher<D, T>(matchers));
+template <typename N>
+Matcher<const N*> ChildrenMatch(NodeMatcherMap<N> matchers) {
+  return MakeMatcher(new ChildrenMatcher<N>(matchers));
 }
 
 
-template<size_t D, typename T>
-class NoChildrenMatcher : public MatcherInterface<const ::qdtree::Node<D, T>*> {
+template<typename N>
+class NoChildrenMatcher : public MatcherInterface<const N*> {
 public:
-  using node_type = ::qdtree::Node<D, T>;
+  using node_type = N;
 
   explicit NoChildrenMatcher() {}
 
@@ -135,7 +136,7 @@ public:
       return false;
     }
 
-    for(size_t i = 0; i < (1 << D); ++i) {
+    for(size_t i = 0; i < node_type::number_of_children; ++i) {
       if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;
@@ -154,16 +155,16 @@ public:
   }
 };
 
-template<size_t D, typename T>
-Matcher<const ::qdtree::Node<D, T>*> HasNoChildren() {
-  return MakeMatcher(new NoChildrenMatcher<D, T>());
+template<typename N>
+Matcher<const N*> HasNoChildren() {
+  return MakeMatcher(new NoChildrenMatcher<N>());
 }
 
 
-template<size_t D, typename T>
-class PointsMatcher : public MatcherInterface<const ::qdtree::Node<D, T>*> {
+template<typename N>
+class PointsMatcher : public MatcherInterface<const N*> {
 public:
-  using node_type = ::qdtree::Node<D, T>;
+  using node_type = N;
 
   PointsMatcher(const Matcher<const typename node_type::value_list_type&>& matcher)
     : matcher(matcher) {}
@@ -174,7 +175,7 @@ public:
       return false;
     }
 
-    for(size_t i = 0; i < (1 << D); ++i) {
+    for(size_t i = 0; i < node_type::number_of_children; ++i) {
       if (n->child(i) != nullptr) {
         *l << "Child " << i << " is not NULL";
         return false;
@@ -200,19 +201,19 @@ private:
   Matcher<const std::list<typename node_type::value_type>&> matcher;
 };
 
-template<size_t D, typename T>
-Matcher<const ::qdtree::Node<D, T>*> PointsAre(::std::initializer_list<T> values) {
-  return MakeMatcher(new PointsMatcher<D, T>(ElementsAreArray(values)));
+template<typename N>
+Matcher<const N*> PointsAre(::std::initializer_list<typename N::value_type> values) {
+  return MakeMatcher(new PointsMatcher<N>(ElementsAreArray(values)));
 }
 
-template<size_t D, typename T>
-Matcher<const ::qdtree::Node<D, T>*> PointsAre(const T& value) {
-  return MakeMatcher(new PointsMatcher<D, T>(ElementsAre(value)));
+template<typename N>
+Matcher<const N*> PointsAre(const typename N::value_type& value) {
+  return MakeMatcher(new PointsMatcher<N>(ElementsAre(value)));
 }
 
-template<size_t D, typename T>
-Matcher<const ::qdtree::Node<D, T>*> PointsAre(const Matcher<const typename ::qdtree::Node<D, T>::value_list_type&>& matcher) {
-  return MakeMatcher(new PointsMatcher<D, T>(matcher));
+template<typename N>
+Matcher<const N*> PointsAre(const Matcher<const typename N::value_list_type&>& matcher) {
+  return MakeMatcher(new PointsMatcher<N>(matcher));
 }
 
 } // namespace testing
@@ -220,30 +221,30 @@ Matcher<const ::qdtree::Node<D, T>*> PointsAre(const Matcher<const typename ::qd
 } // namespace qdtree
 
 // Import shorthand aliases for those matchers.
-#define IMPORT_QDTREE_MATCHERS_ALIASES(D, T, Ac, Al) \
-  ::testing::Matcher<const ::qdtree::QDTree<D, T, Ac, Al>&> \
-  Root(const ::testing::Matcher<const ::qdtree::Node<D, T>*>& matcher) { \
-    return ::qdtree::testing::Root<D, T, Ac, Al>(matcher); \
+#define IMPORT_QDTREE_MATCHERS_ALIASES(Q) \
+  ::testing::Matcher<const Q&> \
+  Root(const ::testing::Matcher<const typename Q::node_type*>& matcher) { \
+    return ::qdtree::testing::Root<Q>(matcher); \
   } \
-  ::testing::Matcher<const ::qdtree::Node<D, T>*> \
-  ChildrenMatch(const ::qdtree::testing::NodeMatcherMap<D, T>& matchers) { \
-    return ::qdtree::testing::ChildrenMatch<D, T>(matchers); \
+  ::testing::Matcher<const typename Q::node_type*> \
+  ChildrenMatch(const ::qdtree::testing::NodeMatcherMap<typename Q::node_type>& matchers) { \
+    return ::qdtree::testing::ChildrenMatch<typename Q::node_type>(matchers); \
   } \
-  ::testing::Matcher<const ::qdtree::Node<D, T>*> \
+  ::testing::Matcher<const typename Q::node_type*> \
   HasNoChildren() { \
-    return ::qdtree::testing::HasNoChildren<D, T>(); \
+    return ::qdtree::testing::HasNoChildren<typename Q::node_type>(); \
   } \
-  ::testing::Matcher<const ::qdtree::Node<D, T>*> \
-  PointsAre(::std::initializer_list<T> values) { \
-    return ::qdtree::testing::PointsAre<D, T>(values); \
+  ::testing::Matcher<const typename Q::node_type*> \
+  PointsAre(::std::initializer_list<typename Q::value_type> values) { \
+    return ::qdtree::testing::PointsAre<typename Q::node_type>(values); \
   } \
-  ::testing::Matcher<const ::qdtree::Node<D, T>*> \
-  PointsAre(const T& value) { \
-    return ::qdtree::testing::PointsAre<D, T>(value); \
+  ::testing::Matcher<const typename Q::node_type*> \
+  PointsAre(const typename Q::value_type& value) { \
+    return ::qdtree::testing::PointsAre<typename Q::node_type>(value); \
   } \
-  ::testing::Matcher<const ::qdtree::Node<D, T>*> \
-  PointsAre(const ::testing::Matcher<const typename ::qdtree::Node<D, T>::value_list_type&>& matcher) { \
-    return ::qdtree::testing::PointsAre<D, T>(matcher); \
+  ::testing::Matcher<const typename Q::node_type*> \
+  PointsAre(const ::testing::Matcher<const typename Q::node_type::value_list_type&>& matcher) { \
+    return ::qdtree::testing::PointsAre<typename Q::node_type>(matcher); \
   }
 
 // Those defines can also be used instead.

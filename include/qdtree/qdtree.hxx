@@ -150,52 +150,38 @@ std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m
   return out;
 }
 
-template <size_t D, typename T>
-inline Node<D, T>::Node()
+template <size_t D, typename O>
+inline Node_Base<D, O>::Node_Base()
   : mChildren{}
-  , mData()
 {}
 
-template <size_t D, typename T>
-inline Node<D, T>::Node(const Node<D, T>::value_type& d)
+template <size_t D, typename O>
+inline Node_Base<D, O>::Node_Base(size_t i, O* child)
   : mChildren{}
-  , mData(1, d)
-{}
-
-template <size_t D, typename T>
-inline Node<D, T>::Node(size_t i, Node<D, T>* child)
-  : mChildren{}
-  , mData()
 {
   mChildren[i] = child;
 }
 
-template <size_t D, typename T>
-inline Node<D, T>::Node(const value_list_type& otherData)
-  : mChildren{}
-  , mData(otherData)
-{}
-
-template <size_t D, typename T>
-inline Node<D, T>* Node<D, T>::child(size_t i) const {
+template <size_t D, typename O>
+inline O* Node_Base<D, O>::child(size_t i) const {
   return mChildren[i];
 }
 
-template <size_t D, typename T>
-inline bool Node<D, T>::leaf() const {
+template <size_t D, typename O>
+inline bool Node_Base<D, O>::leaf() const {
   return std::all_of(mChildren.cbegin(),
                      mChildren.cend(),
-                     [](const Node* o){ return o == nullptr; });
+                     [](const O* o){ return o == nullptr; });
 }
 
-template <size_t D, typename T>
-inline const typename Node<D, T>::child_list_type&
-Node<D, T>::children() const {
+template <size_t D, typename O>
+inline const typename Node_Base<D, O>::child_list_type&
+Node_Base<D, O>::children() const {
   return mChildren;
 }
 
-template <size_t D, typename T>
-inline bool Node<D, T>::has_siblings(size_t j) const {
+template <size_t D, typename O>
+inline bool Node_Base<D, O>::has_siblings(size_t j) const {
   for (size_t i = 0; i < D; ++i) {
     if(i != j && mChildren[i] != nullptr) {
       return true;
@@ -204,34 +190,34 @@ inline bool Node<D, T>::has_siblings(size_t j) const {
   return false;
 }
 
-template <size_t D, typename T>
+template <size_t D, typename O>
 inline void
-Node<D, T>::addChild(size_t i, Node* n) {
+Node_Base<D, O>::addChild(size_t i, O* n) {
   mChildren[i] = n;
 }
 
-template <size_t D, typename T>
-inline Node<D, T>*
-Node<D, T>::removeChild(size_t i) {
-  Node* n = mChildren[i];
+template <size_t D, typename O>
+inline O*
+Node_Base<D, O>::removeChild(size_t i) {
+  O* n = mChildren[i];
   mChildren[i] = nullptr;
   return n;
 }
 
-template <size_t D, typename T>
-inline void Node<D, T>::truncate() {
+template <size_t D, typename O>
+inline void Node_Base<D, O>::truncate() {
   mChildren.fill(nullptr);
 }
 
-template <size_t D, typename T>
-inline void Node<D, T>::setChild(size_t i, Node<D, T>* child) {
+template <size_t D, typename O>
+inline void Node_Base<D, O>::setChild(size_t i, O* child) {
   mChildren[i] = child;
 }
 
-template <size_t D, typename T>
-inline Node<D, T>*
-Node<D, T>::firstChild() {
-  for(Node* child : mChildren) {
+template <size_t D, typename O>
+inline O*
+Node_Base<D, O>::firstChild() {
+  for(O* child : mChildren) {
     if (child != nullptr) {
       return child;
     }
@@ -240,9 +226,9 @@ Node<D, T>::firstChild() {
   return nullptr;
 }
 
-template <size_t D, typename T>
-inline Node<D, T>*
-Node<D, T>::lastChild() {
+template <size_t D, typename O>
+inline O*
+Node_Base<D, O>::lastChild() {
   for(auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
     if (*it) {
       return *it;
@@ -251,6 +237,32 @@ Node<D, T>::lastChild() {
 
   return nullptr;
 }
+
+
+
+template <size_t D, typename T>
+inline Node<D, T>::Node()
+  : Node_Base<D, Node<D, T>>()
+  , mData()
+{}
+
+template <size_t D, typename T>
+inline Node<D, T>::Node(const Node<D, T>::value_type& d)
+  : Node_Base<D, Node<D, T>>()
+  , mData(1, d)
+{}
+
+template <size_t D, typename T>
+inline Node<D, T>::Node(size_t i, Node<D, T>* child)
+  : Node_Base<D, Node<D, T>>(i, child)
+  , mData()
+{}
+
+template <size_t D, typename T>
+inline Node<D, T>::Node(const Node &other)
+  : Node_Base<D, Node<D, T>>()
+  , mData(other.mData)
+{}
 
 template <size_t D, typename T>
 inline const std::list<T>& Node<D, T>::data() const {
@@ -278,8 +290,8 @@ inline bool Node<D, T>::removeData(const T& data) {
 }
 
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>::QDTree()
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>::QDTree()
 noexcept(std::is_nothrow_default_constructible<allocator_type>::value)
   : mAllocator()
   , mCoordinateAccessor()
@@ -288,8 +300,8 @@ noexcept(std::is_nothrow_default_constructible<allocator_type>::value)
   , mRoot(nullptr)
 {}
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>::QDTree(const allocator_type& a)
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>::QDTree(const allocator_type& a)
   : mAllocator(a)
   , mCoordinateAccessor()
   , mLb()
@@ -297,8 +309,8 @@ QDTree<D, T, A, Allocator>::QDTree(const allocator_type& a)
   , mRoot(nullptr)
 {}
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>::QDTree(const QDTree& other)
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>::QDTree(const QDTree& other)
   : mAllocator(allocator_traits::select_on_container_copy_construction(other.mAllocator))
   , mCoordinateAccessor(other.mCoordinateAccessor)
   , mLb(other.mLb)
@@ -310,8 +322,8 @@ QDTree<D, T, A, Allocator>::QDTree(const QDTree& other)
   }
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>::QDTree(QDTree&& other)
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>::QDTree(QDTree&& other)
 noexcept(std::is_nothrow_move_constructible<allocator_type>::value)
   : mAllocator(std::move(other.mAllocator))
   , mCoordinateAccessor(std::move(other.mCoordinateAccessor))
@@ -322,15 +334,15 @@ noexcept(std::is_nothrow_move_constructible<allocator_type>::value)
   other.mRoot = nullptr;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>::~QDTree()
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>::~QDTree()
 {
   destroy_node(mRoot);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>&
-QDTree<D, T, A, Allocator>::operator=(const QDTree& other)
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>&
+QDTree<N, A, Allocator>::operator=(const QDTree& other)
 {
   if (this == &other) return *this;
 
@@ -351,9 +363,9 @@ QDTree<D, T, A, Allocator>::operator=(const QDTree& other)
   return *this;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-QDTree<D, T, A, Allocator>&
-QDTree<D, T, A, Allocator>::operator=(QDTree&& other) noexcept
+template <typename N, typename A, typename Allocator>
+QDTree<N, A, Allocator>&
+QDTree<N, A, Allocator>::operator=(QDTree&& other) noexcept
 {
   if (this == &other) return *this;
 
@@ -378,54 +390,54 @@ QDTree<D, T, A, Allocator>::operator=(QDTree&& other) noexcept
   return *this;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline typename QDTree<D, T, A, Allocator>::coord_type
-QDTree<D, T, A, Allocator>::coordinates(const value_type& in) const
+template <typename N, typename A, typename Allocator>
+inline typename QDTree<N, A, Allocator>::coord_type
+QDTree<N, A, Allocator>::coordinates(const value_type& in) const
 {
   QDTree::coord_type out;
-  for(size_t i = 0; i < D; ++i)
+  for(size_t i = 0; i < node_type::dimension; ++i)
     out[i] = mCoordinateAccessor(in, i);
   return out;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 inline void
-QDTree<D, T, A, Allocator>::coordinates(
+QDTree<N, A, Allocator>::coordinates(
     const value_type& in,
     coord_type& out) const
 {
-  for(size_t i = 0; i < D; ++i)
+  for(size_t i = 0; i < node_type::dimension; ++i)
     out[i] = mCoordinateAccessor(in, i);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-const typename QDTree<D, T, A, Allocator>::node_type*
-QDTree<D, T, A, Allocator>::root() const
+template <typename N, typename A, typename Allocator>
+const typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::root() const
 {
   return mRoot;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline const typename QDTree<D, T, A, Allocator>::coord_type&
-QDTree<D, T, A, Allocator>::lowerBound() const {
+template <typename N, typename A, typename Allocator>
+inline const typename QDTree<N, A, Allocator>::coord_type&
+QDTree<N, A, Allocator>::lowerBound() const {
   return mLb;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline const typename QDTree<D, T, A, Allocator>::coord_type&
-QDTree<D, T, A, Allocator>::upperBound() const {
+template <typename N, typename A, typename Allocator>
+inline const typename QDTree<N, A, Allocator>::coord_type&
+QDTree<N, A, Allocator>::upperBound() const {
   return mUb;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-typename QDTree<D, T, A, Allocator>::extent_type
-QDTree<D, T, A, Allocator>::extent() const {
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::extent_type
+QDTree<N, A, Allocator>::extent() const {
   return std::make_pair(mLb, mUb);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::cover(const coord_type& p)
+QDTree<N, A, Allocator>::cover(const coord_type& p)
 {
   coord_type a = mLb, b = mUb;
 
@@ -434,7 +446,7 @@ QDTree<D, T, A, Allocator>::cover(const coord_type& p)
   if (a == b) {
     // The octree has no extent.
     // Integer values are used to later allow *2 and /2 operations without loss of precision.
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < node_type::dimension; ++i) {
       a[i] = std::floor(p[i]);
       b[i] = a[i] + 1;
     }
@@ -444,8 +456,8 @@ QDTree<D, T, A, Allocator>::cover(const coord_type& p)
     // Extend needs to be increased. Double repeatedly to cover.
     node_type* node = mRoot;
     coord_value_type w = b[0] - a[0];
-    std::bitset<D> index;
-    for(size_t i = 0; i < D; ++i)
+    std::bitset<node_type::dimension> index;
+    for(size_t i = 0; i < node_type::dimension; ++i)
       index.set(i, p[i] < (a[i] + b[i]) / 2.0);
 
     do {
@@ -456,7 +468,7 @@ QDTree<D, T, A, Allocator>::cover(const coord_type& p)
 
       w *= 2;
 
-      for(size_t i = 0; i < D; ++i) {
+      for(size_t i = 0; i < node_type::dimension; ++i) {
         if (index.test(i)) { a[i] = b[i] - w; }
         else               { b[i] = a[i] + w; }
       }
@@ -473,9 +485,9 @@ QDTree<D, T, A, Allocator>::cover(const coord_type& p)
   mUb = b;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::add(const T& data)
+QDTree<N, A, Allocator>::add(const value_type& data)
 {
   coord_type coord = coordinates(data);
 
@@ -483,19 +495,19 @@ QDTree<D, T, A, Allocator>::add(const T& data)
   add(data, coord);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::unsafe_add(const T& data)
+QDTree<N, A, Allocator>::unsafe_add(const value_type& data)
 {
   coord_type coord = coordinates(data);
 
   add(data, coord);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::add(
-    const T& data,
+QDTree<N, A, Allocator>::add(
+    const value_type& data,
     const coord_type& coord)
 {
   LOGLN("# Adding " << data);
@@ -518,7 +530,7 @@ QDTree<D, T, A, Allocator>::add(
   size_t level = 0;
 #endif
 
-  std::bitset<D> data_index;
+  std::bitset<node_type::dimension> data_index;
   size_t i;
 
   // Find the existing leaf for the new point, or add it.
@@ -587,9 +599,9 @@ QDTree<D, T, A, Allocator>::add(
   ILOGLN(level, "Inserting " << data << " in " << parent->child(i));
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::remove(const T& data) {
+QDTree<N, A, Allocator>::remove(const value_type &data) {
   node_type* parent = nullptr;
   node_type* node = mRoot;
   node_type* retainer = nullptr;
@@ -605,7 +617,7 @@ QDTree<D, T, A, Allocator>::remove(const T& data) {
   size_t level = 0;
 #endif
 
-  std::bitset<D> data_index;
+  std::bitset<node_type::dimension> data_index;
   size_t i, j;
 
   // Find the leaf node for the point.
@@ -684,18 +696,18 @@ QDTree<D, T, A, Allocator>::remove(const T& data) {
   }
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline Node<D, T>*
-QDTree<D, T, A, Allocator>::allocate_node()
+template <typename N, typename A, typename Allocator>
+inline typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::allocate_node()
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
   new(n) node_type();
   return n;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline Node<D, T>*
-QDTree<D, T, A, Allocator>::allocate_node(const typename node_type::value_type& d)
+template <typename N, typename A, typename Allocator>
+inline typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::allocate_node(const typename node_type::value_type& d)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
   new(n) node_type(d);
@@ -703,28 +715,29 @@ QDTree<D, T, A, Allocator>::allocate_node(const typename node_type::value_type& 
 }
 
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline Node<D, T>*
-QDTree<D, T, A, Allocator>::allocate_node(size_t i, node_type* child)
+template <typename N, typename A, typename Allocator>
+inline typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::allocate_node(size_t i, node_type* child)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
   new(n) node_type(i, child);
   return n;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-inline Node<D, T>*
-QDTree<D, T, A, Allocator>::allocate_node(const typename node_type::value_list_type& otherData)
+template <typename N, typename A, typename Allocator>
+inline typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::allocate_node(const node_type& other)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
-  new(n) node_type(otherData);
+  new(n) node_type(other);
   return n;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-Node<D, T>* QDTree<D, T, A, Allocator>::clone_node(const node_type& other)
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::node_type*
+QDTree<N, A, Allocator>::clone_node(const node_type& other)
 {
-  node_type* n = allocate_node(other.data());
+  node_type* n = allocate_node(other);
 
   // Do not perform the copy recursively.
   // First make a shallow (data only) copy of the node, and push it in a
@@ -744,7 +757,7 @@ Node<D, T>* QDTree<D, T, A, Allocator>::clone_node(const node_type& other)
       const node_type* fromChild = from->child(i);
 
       if (fromChild != nullptr) {
-        node_type* toChild = allocate_node(fromChild->data());
+        node_type* toChild = allocate_node(*fromChild);
         to->setChild(i, toChild);
         nodes.emplace_back(toChild, fromChild);
       }
@@ -754,8 +767,8 @@ Node<D, T>* QDTree<D, T, A, Allocator>::clone_node(const node_type& other)
   return n;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-void QDTree<D, T, A, Allocator>::destroy_node(node_type* node)
+template <typename N, typename A, typename Allocator>
+void QDTree<N, A, Allocator>::destroy_node(node_type* node)
 {
   if (node == nullptr)
     return;
@@ -778,14 +791,14 @@ void QDTree<D, T, A, Allocator>::destroy_node(node_type* node)
 }
 
 
-template <size_t D, typename T, typename A, typename Allocator>
-const T*
-QDTree<D, T, A, Allocator>::find(
+template <typename N, typename A, typename Allocator>
+const typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find(
     const coord_type& target,
     node_iterator_type& it,
     coord_value_type radius) const
 {
-  const T* needle = nullptr;
+  const value_type* needle = nullptr;
 
   if (mRoot == nullptr)
     return needle;
@@ -797,7 +810,7 @@ QDTree<D, T, A, Allocator>::find(
   it.queue(mRoot, search_lb, search_ub);
 
   if (std::isfinite(radius)) {
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < node_type::dimension; ++i) {
       search_lb[i] = target[i] - radius;
       search_ub[i] = target[i] + radius;
     }
@@ -824,7 +837,7 @@ QDTree<D, T, A, Allocator>::find(
       LOGLN("Visiting point: " << print_coords(it.coords));
 
       coord_value_type d2 = 0;
-      for(size_t i = 0; i < D; ++i) {
+      for(size_t i = 0; i < node_type::dimension; ++i) {
         coord_value_type d = it.coords[i] - target[i];
         d2 += d*d;
       }
@@ -832,7 +845,7 @@ QDTree<D, T, A, Allocator>::find(
       if (d2 < radius) {
         radius = d2;
         coord_value_type d = std::sqrt(d2);
-        for(size_t i = 0; i < D; ++i) {
+        for(size_t i = 0; i < node_type::dimension; ++i) {
           search_lb[i] = target[i] - d;
           search_ub[i] = target[i] + d;
         }
@@ -849,21 +862,21 @@ QDTree<D, T, A, Allocator>::find(
   return needle;
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-T*
-QDTree<D, T, A, Allocator>::find(
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find(
     const coord_type& target,
     node_iterator_type& it,
     coord_value_type radius)
 {
-  return const_cast<T*>(
+  return const_cast<value_type*>(
         static_cast<const QDTree&>(*this).find(target, it, radius)
         );
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-const T*
-QDTree<D, T, A, Allocator>::find(
+template <typename N, typename A, typename Allocator>
+const typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find(
     const coord_type& target,
     coord_value_type radius) const
 {
@@ -871,21 +884,21 @@ QDTree<D, T, A, Allocator>::find(
   return find(target, it, radius);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-T*
-QDTree<D, T, A, Allocator>::find(
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find(
     const coord_type& target,
     coord_value_type radius)
 {
-  return const_cast<T*>(
+  return const_cast<value_type*>(
         static_cast<const QDTree&>(*this).find(target, radius)
         );
 }
 
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::accept(
+QDTree<N, A, Allocator>::accept(
     const_visitor_type *visitor,
     node_iterator_type& iterator) const
 {
@@ -906,17 +919,17 @@ QDTree<D, T, A, Allocator>::accept(
   }
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::accept(const_visitor_type *visitor) const
+QDTree<N, A, Allocator>::accept(const_visitor_type *visitor) const
 {
   node_iterator_type iterator(node_type::number_of_children * 8);
   accept(visitor, iterator);
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::accept(
+QDTree<N, A, Allocator>::accept(
     visitor_type *visitor,
     node_iterator_type& iterator)
 {
@@ -937,58 +950,58 @@ QDTree<D, T, A, Allocator>::accept(
   }
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 void
-QDTree<D, T, A, Allocator>::accept(visitor_type *visitor)
+QDTree<N, A, Allocator>::accept(visitor_type *visitor)
 {
   node_iterator_type iterator(node_type::number_of_children * 8);
   accept(visitor, iterator);
 }
 
 
-template <size_t D, typename T, typename A, typename Allocator>
-const T*
-QDTree<D, T, A, Allocator>::find_visitor(
+template <typename N, typename A, typename Allocator>
+const typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find_visitor(
     const coord_type& target,
     node_iterator_type& iterator,
     coord_value_type radius) const
 {
-  ConstNearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  ConstNearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
   accept(&visitor, iterator);
   return visitor.getNearestNeighbor();
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-const T*
-QDTree<D, T, A, Allocator>::find_visitor(
+template <typename N, typename A, typename Allocator>
+const typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find_visitor(
     const coord_type& target,
     coord_value_type radius) const
 {
-  ConstNearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  ConstNearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
   accept(&visitor);
   return visitor.getNearestNeighbor();
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-T*
-QDTree<D, T, A, Allocator>::find_visitor(
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find_visitor(
     const coord_type& target,
     node_iterator_type& iterator,
     coord_value_type radius)
 {
-  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  NearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
   accept(&visitor, iterator);
   return visitor.getNearestNeighbor();
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
-T*
-QDTree<D, T, A, Allocator>::find_visitor(
+template <typename N, typename A, typename Allocator>
+typename QDTree<N, A, Allocator>::value_type*
+QDTree<N, A, Allocator>::find_visitor(
     const coord_type& target,
     coord_value_type radius
     )
 {
-  NearestNeighborVisitor<D, T, coord_value_type> visitor(target, radius);
+  NearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
   accept(&visitor);
   return visitor.getNearestNeighbor();
 }
@@ -1171,13 +1184,13 @@ NearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
   return const_cast<T*>(mImpl.getNearestNeighbor());
 }
 
-template <size_t D, typename T, typename A, typename Allocator>
+template <typename N, typename A, typename Allocator>
 std::ostream&
 operator<<(
     std::ostream& out,
-    const QDTree<D, T, A, Allocator>& tree)
+    const QDTree<N, A, Allocator>& tree)
 {
-  using Tree = QDTree<D, T, A, Allocator>;
+  using Tree = QDTree<N, A, Allocator>;
 
   std::list<std::tuple<
       const typename Tree::node_type*,
@@ -1244,9 +1257,11 @@ namespace qdtree { \
   template \
   class Node<dimension, type>; \
   template \
-  class QDTree<dimension, type>; \
+  class Node_Base<dimension, Node<dimension, type>>; \
   template \
-  std::ostream& operator<<(std::ostream& out, const QDTree<dimension, type>& tree); \
+  class QDTree<Node<dimension, type>>; \
+  template \
+  std::ostream& operator<<(std::ostream& out, const QDTree<Node<dimension, type>>& tree); \
 }
 
 } // namespace qdtree

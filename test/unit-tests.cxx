@@ -4,7 +4,7 @@
 
 using namespace ::testing;
 
-IMPORT_QDTREE_MATCHERS_ALIASES(2, Point, Tree::accessor_type, Tree::allocator_type)
+IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
 
 Tree::extent_type extent(const Tree::coord_type& lb,
                          const Tree::coord_type& ub) {
@@ -349,7 +349,7 @@ TEST(QDTree, find_visitor)
     }
   }
 
-  using V = TracedNearestNeighborVisitor<Tree::dimension, Tree::value_type, Tree::coord_value_type>;
+  using V = TracedNearestNeighborVisitor<Tree::node_type::dimension, Tree::value_type, Tree::coord_value_type>;
 
   Tree::coord_type target = {3.0, 3.0};
   V visitor(target);

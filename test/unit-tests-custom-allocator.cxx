@@ -25,7 +25,7 @@ using Allocator = foonathan::memory::std_allocator<
   qdtree::Node<2, Point>,
   foonathan::memory::memory_pool<>>;
 
-using Tree = qdtree::QDTree<2, Point, Accessor, Allocator>;
+using Tree = qdtree::QDTree<qdtree::Node<2, Point>, Accessor, Allocator>;
 
 Tree::extent_type extent(const Tree::coord_type& lb,
                          const Tree::coord_type& ub) {
@@ -34,7 +34,7 @@ Tree::extent_type extent(const Tree::coord_type& lb,
 
 using namespace ::testing;
 
-IMPORT_QDTREE_MATCHERS_ALIASES(2, Point, Accessor, Allocator)
+IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
 
 TEST(QDTreeCustomAllocator, copy_ctor)
 {

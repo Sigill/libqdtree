@@ -85,15 +85,17 @@ struct XYRefAccessor {
   }
 };
 
-using VTree = qdtree::QDTree<2, my::Point, XYRefAccessor>;
-using RTree = qdtree::QDTree<2, std::reference_wrapper<my::Point>, XYRefAccessor>;
-using PTree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor>;
+using VTree = qdtree::QDTree<qdtree::Node<2, my::Point>, XYRefAccessor>;
+using RTree = qdtree::QDTree<qdtree::Node<2, std::reference_wrapper<my::Point>>, XYRefAccessor>;
+using PTree = qdtree::QDTree<qdtree::Node<2, const my::Point*>, XYPointerAccessor>;
 
 using FPAllocator = foonathan::memory::std_allocator<
   PTree::node_type,
   foonathan::memory::memory_pool<>>;
 
-using PFATree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor, FPAllocator>;
+using PFATree = qdtree::QDTree<qdtree::Node<2, const my::Point*>,
+                               XYPointerAccessor,
+                               FPAllocator>;
 
 using BPAllocator =  boost::fast_pool_allocator<
     PTree::node_type,
@@ -101,7 +103,9 @@ using BPAllocator =  boost::fast_pool_allocator<
     boost::details::pool::default_mutex
 >;
 
-using PBATree = qdtree::QDTree<2, const my::Point *, XYPointerAccessor, BPAllocator>;
+using PBATree = qdtree::QDTree<qdtree::Node<2, const my::Point*>,
+                               XYPointerAccessor,
+                               BPAllocator>;
 
 template<typename T>
 T make_tree(size_t N) {

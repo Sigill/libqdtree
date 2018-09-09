@@ -33,14 +33,59 @@ struct BraketAccessor
 };
 
 
-template <size_t D, typename T>
-class Node
+template <size_t D, typename O>
+class Node_Base
 {
 public:
+  static constexpr size_t dimension = D;
   static constexpr size_t number_of_children = 1 << D;
 
+  using child_list_type = std::array<O*, number_of_children>;
+
+  inline Node_Base();
+
+  inline Node_Base(size_t i, O* child);
+
+  /**
+   * @brief Destructor.
+   *
+   * This destructor does not process the children.
+   * They must be deleted using QDTree::destroy_node().
+   *
+   * Not virtual because a Node_Base is never manipulated,
+   * and being virtual reduce the performances.
+   */
+  ~Node_Base() = default;
+
+  O* child(size_t i) const;
+
+  bool leaf() const;
+
+  const child_list_type& children() const;
+
+  bool has_siblings(size_t j) const;
+
+  void addChild(size_t i, O* n);
+
+  O *removeChild(size_t i);
+
+  void truncate();
+
+  void setChild(size_t i, O* child);
+
+  O* firstChild();
+
+  O* lastChild();
+
+protected:
+  child_list_type mChildren;
+};
+
+template <size_t D, typename T>
+class Node : public Node_Base<D, Node<D, T>>
+{
+public:
   using value_type = T;
-  using child_list_type = std::array<Node*, 1 << D>;
   using value_list_type = std::list<value_type>;
 
   Node();
@@ -54,35 +99,9 @@ public:
    *
    * This constructor only copy data. Children are handled separately.
    */
-  explicit Node(const value_list_type& otherData);
+  explicit Node(const Node& other);
 
-  Node* child(size_t i) const;
-
-  /**
-   * @brief Destructor.
-   *
-   * This destructor does process the children.
-   * They must be deleted using QDTree::destroy_node().
-   */
   ~Node() = default;
-
-  bool leaf() const;
-
-  const child_list_type& children() const;
-
-  bool has_siblings(size_t j) const;
-
-  void addChild(size_t i, Node* n);
-
-  Node *removeChild(size_t i);
-
-  void truncate();
-
-  void setChild(size_t i, Node* child);
-
-  Node* firstChild();
-
-  Node* lastChild();
 
   value_list_type& data();
 
@@ -93,7 +112,6 @@ public:
   bool removeData(const T& data);
 
 protected:
-  child_list_type mChildren;
   value_list_type mData;
 };
 
@@ -304,26 +322,23 @@ private:
 };
 
 
-template <size_t D,   // Dimension
-          typename T, // Point type
-          typename A = BraketAccessor<T, double>,
-          typename Allocator = std::allocator<Node<D, T>>>
+template <typename N, // Node type
+          typename A = BraketAccessor<typename N::value_type, double>,
+          typename Allocator = std::allocator<N>>
 class QDTree
 {
 public:
-  using value_type = T;
-  using node_type = Node<D, T>;
+  using node_type = N;
+  using value_type = typename node_type::value_type;
   using accessor_type = A;
   using allocator_type = Allocator;
   using allocator_traits = std::allocator_traits<allocator_type>;
   using coord_value_type = typename A::value_type;
-  using coord_type = std::array<coord_value_type, D>;
+  using coord_type = std::array<coord_value_type, node_type::dimension>;
   using extent_type = std::pair<coord_type, coord_type>;
-  using node_iterator_type = VisitorView<D, T, coord_value_type>;
-  using visitor_type = Visitor<D, T, coord_value_type>;
-  using const_visitor_type = ConstVisitor<D, T, coord_value_type>;
-
-  static constexpr size_t dimension = D;
+  using node_iterator_type = VisitorView<node_type::dimension, value_type, coord_value_type>;
+  using visitor_type = Visitor<node_type::dimension, value_type, coord_value_type>;
+  using const_visitor_type = ConstVisitor<node_type::dimension, value_type, coord_value_type>;
 
 protected:
   allocator_type mAllocator;
@@ -360,16 +375,16 @@ public:
 
   void cover(const coord_type& p);
 
-  void add(const T& data);
+  void add(const value_type& data);
 
-  void unsafe_add(const T& data);
+  void unsafe_add(const value_type& data);
 
-  void remove(const T& data);
+  void remove(const value_type& data);
 
   node_type* allocate_node();
   node_type* allocate_node(const typename node_type::value_type& d);
   node_type* allocate_node(size_t i, node_type* child);
-  node_type* allocate_node(const typename node_type::value_list_type& otherData);
+  node_type* allocate_node(const node_type& other);
 
   node_type* clone_node(const node_type& other);
 
@@ -385,19 +400,23 @@ public:
   void destroy_node(node_type* node);
 
 
-  const T* find(const coord_type& target,
-                node_iterator_type& iterator,
-                coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+  const value_type* find(
+      const coord_type& target,
+      node_iterator_type& iterator,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  T* find(const coord_type& target,
-          node_iterator_type& iterator,
-          coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+  value_type* find(
+      const coord_type& target,
+      node_iterator_type& iterator,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
-  const T* find(const coord_type& target,
-                coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+  const value_type* find(
+      const coord_type& target,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  T* find(const coord_type& target,
-          coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+  value_type* find(
+      const coord_type& target,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
 
   void accept(const_visitor_type* visitor,
@@ -411,26 +430,30 @@ public:
   void accept(visitor_type* visitor);
 
 
-  const T* find_visitor(const coord_type& target,
-                        node_iterator_type& iterator,
-                        coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+  const value_type* find_visitor(
+      const coord_type& target,
+      node_iterator_type& iterator,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  const T* find_visitor(const coord_type& target,
-                        coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
+  const value_type* find_visitor(
+      const coord_type& target,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  T* find_visitor(const coord_type& target,
-                  node_iterator_type& iterator,
-                  coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+  value_type* find_visitor(
+      const coord_type& target,
+      node_iterator_type& iterator,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
-  T* find_visitor(const coord_type& target,
-                  coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
+  value_type* find_visitor(
+      const coord_type& target,
+      coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
 private:
-  void add(const T& data, const coord_type &coord);
+  void add(const value_type& data, const coord_type &coord);
 };
 
-template <size_t D, typename T, typename A, typename Allocator>
-std::ostream& operator<<(std::ostream& out, const QDTree<D, T, A, Allocator>& tree);
+template <typename N, typename A, typename Allocator>
+std::ostream& operator<<(std::ostream& out, const QDTree<N, A, Allocator>& tree);
 
 } // namespace qdtree
 
