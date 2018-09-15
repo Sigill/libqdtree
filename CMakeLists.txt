@@ -17,9 +17,13 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 set(QDTREE_PUBLIC_HEADERS
   include/qdtree/infix_iterator.hxx
-  include/qdtree/qdtree_decl.hxx
+  include/qdtree/node_base.hxx
+  include/qdtree/node_base.h
+  include/qdtree/node.hxx
+  include/qdtree/node.h
+  include/qdtree/qdtree.h
   include/qdtree/qdtree.hxx
-  include/qdtree/utils_decl.hxx
+  include/qdtree/utils.h
   include/qdtree/utils.hxx
   )
 

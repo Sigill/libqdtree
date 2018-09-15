@@ -33,115 +33,18 @@ struct BraketAccessor
 };
 
 
-template <size_t D, typename O>
-class Node_Base
-{
-public:
-  static constexpr size_t dimension = D;
-  static constexpr size_t number_of_children = 1 << D;
 
-  using child_list_type = std::array<O*, number_of_children>;
-
-  inline Node_Base();
-
-  inline Node_Base(size_t i, O* child);
-
-  /**
-   * @brief Destructor.
-   *
-   * This destructor does not process the children.
-   * They must be deleted using QDTree::destroy_node().
-   *
-   * Not virtual because a Node_Base is never manipulated,
-   * and being virtual reduce the performances.
-   */
-  ~Node_Base() = default;
-
-  O* child(size_t i) const;
-
-  bool leaf() const;
-
-  const child_list_type& children() const;
-
-  bool has_siblings(size_t j) const;
-
-  void addChild(size_t i, O* n);
-
-  O *removeChild(size_t i);
-
-  void truncate();
-
-  void setChild(size_t i, O* child);
-
-  O* firstChild();
-
-  O* lastChild();
-
-protected:
-  child_list_type mChildren;
-};
-
-template <size_t D, typename T>
-class Node : public Node_Base<D, Node<D, T>>
-{
-public:
-  using value_type = T;
-  using value_list_type = std::list<value_type>;
-
-  Node();
-
-  explicit Node(const value_type& d);
-
-  Node(size_t i, Node* child);
-
-  /**
-   * @brief Constructor used by the copy constructor to perform a deep copy.
-   *
-   * This constructor only copy data. Children are handled separately.
-   */
-  explicit Node(const Node& other);
-
-  ~Node() = default;
-
-  value_list_type& data();
-
-  const value_list_type& data() const;
-
-  void addData(const T& data);
-
-  bool removeData(const T& data);
-
-protected:
-  value_list_type mData;
-};
-
-
-
-template <size_t D, typename T>
-struct print_node_data_manip
-{
-  const Node<D, T>* node;
-  print_node_data_manip(const Node<D, T>* node);
-};
-
-template <size_t D, typename T>
-print_node_data_manip<D, T> print_node_data(const Node<D, T>* node);
-
-template <size_t D, typename T>
-std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m);
-
-
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 class VisitorView;
 
-template <size_t D, typename T, // Same as in Node<D, T>
+template <typename N,
           typename C>           // Integral coordinates type
 class ConstVisitorView
 {
-  using UnderlyingView = VisitorView<D, T, C>;
+  using UnderlyingView = VisitorView<N, C>;
 public:
-  using coord_type = std::array<C, D>;
-  using node_type = Node<D, T>;
+  using node_type = N;
+  using coord_type = std::array<C, N::dimension>;
 
 public:
   ConstVisitorView(UnderlyingView &other)
@@ -169,14 +72,14 @@ private:
 };
 
 
-template <size_t D, typename T, // Same as in Node<D, T>
+template <typename N,
           typename C>           // Integral coordinates type
 class VisitorView
 {
 public:
-  using node_type = Node<D, T>;
+  using node_type = N;
   using coord_value_type = C;
-  using coord_type = std::array<C, D>;
+  using coord_type = std::array<C, N::dimension>;
   using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
   using Queue = std::vector<QueueItem>;
 
@@ -236,47 +139,47 @@ private:
   Queue mQueue;
 
 public:
-  ConstVisitorView<D, T, C> as_const;
+  ConstVisitorView<N, C> as_const;
 };
 
-template <size_t D, typename T, typename C>
-void ConstVisitorView<D, T, C>::clearQueue()
+template <typename N, typename C>
+void ConstVisitorView<N, C>::clearQueue()
 {
   view.clearQueue();
 }
 
-template <size_t D, typename T, typename C>
-void ConstVisitorView<D, T, C>::queueChildren()
+template <typename N, typename C>
+void ConstVisitorView<N, C>::queueChildren()
 {
   view.queueChildren();
 }
 
-template <size_t D, typename T, typename C>
-void ConstVisitorView<D, T, C>::queueChildren(size_t first)
+template <typename N, typename C>
+void ConstVisitorView<N, C>::queueChildren(size_t first)
 {
   view.queueChildren(first);
 }
 
-template <size_t D, typename T, // Same as in Node<D, T>
+template <typename N,
           typename C>           // Integral coordinates type
 class Visitor {
 public:
-  using view_type = VisitorView<D, T, C>;
+  using view_type = VisitorView<N, C>;
 
   virtual void visit(view_type& it) = 0;
 };
 
-template <size_t D, typename T, // Same as in Node<D, T>
+template <typename N,
           typename C>           // Integral coordinates type
 class ConstVisitor {
 public:
-  using view_type = ConstVisitorView<D, T, C>;
+  using view_type = ConstVisitorView<N, C>;
 
   virtual void visit(view_type& it) = 0;
 };
 
-template <size_t D, typename T, typename C>
-class ConstNearestNeighborVisitor : public ConstVisitor<D, T, C>
+template <typename N, typename C>
+class ConstNearestNeighborVisitor : public ConstVisitor<N, C>
 {
 public:
   using typename ConstNearestNeighborVisitor::ConstVisitor::view_type;
@@ -300,8 +203,8 @@ private:
   const value_type* mNearestNeighbor;
 };
 
-template <size_t D, typename T, typename C>
-class NearestNeighborVisitor : public Visitor<D, T, C>
+template <typename N, typename C>
+class NearestNeighborVisitor : public Visitor<N, C>
 {
 public:
   using typename NearestNeighborVisitor::Visitor::view_type;
@@ -318,7 +221,7 @@ public:
   value_type* getNearestNeighbor() const;
 
 private:
-  ConstNearestNeighborVisitor<D, T, C> mImpl;
+  ConstNearestNeighborVisitor<N, C> mImpl;
 };
 
 
@@ -336,9 +239,9 @@ public:
   using coord_value_type = typename A::value_type;
   using coord_type = std::array<coord_value_type, node_type::dimension>;
   using extent_type = std::pair<coord_type, coord_type>;
-  using node_iterator_type = VisitorView<node_type::dimension, value_type, coord_value_type>;
-  using visitor_type = Visitor<node_type::dimension, value_type, coord_value_type>;
-  using const_visitor_type = ConstVisitor<node_type::dimension, value_type, coord_value_type>;
+  using node_iterator_type = VisitorView<node_type, coord_value_type>;
+  using visitor_type = Visitor<node_type, coord_value_type>;
+  using const_visitor_type = ConstVisitor<node_type, coord_value_type>;
 
 protected:
   allocator_type mAllocator;

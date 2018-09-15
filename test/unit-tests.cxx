@@ -308,9 +308,9 @@ TEST(QDTree, find)
   ASSERT_EQ(*n2, Point({4.0, 4.0}));
 }
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 class TracedNearestNeighborVisitor
-    : public qdtree::ConstNearestNeighborVisitor<D, T, C>
+    : public qdtree::ConstNearestNeighborVisitor<N, C>
 {
 public:
   using Base = typename TracedNearestNeighborVisitor::ConstNearestNeighborVisitor;
@@ -349,7 +349,7 @@ TEST(QDTree, find_visitor)
     }
   }
 
-  using V = TracedNearestNeighborVisitor<Tree::node_type::dimension, Tree::value_type, Tree::coord_value_type>;
+  using V = TracedNearestNeighborVisitor<Tree::node_type, Tree::coord_value_type>;
 
   Tree::coord_type target = {3.0, 3.0};
   V visitor(target);

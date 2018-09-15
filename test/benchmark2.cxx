@@ -1,3 +1,4 @@
+#include "qdtree/node.hxx"
 #include "qdtree/qdtree.hxx"
 
 #include <vector>

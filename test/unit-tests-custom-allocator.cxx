@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "qdtree/node.hxx"
 #include "qdtree/qdtree.hxx"
 
 #include <foonathan/memory/memory_pool.hpp>

@@ -8,10 +8,8 @@
 #include <vector>
 #include <memory>
 
-#include "qdtree/infix_iterator.hxx"
-
 #include "qdtree/utils.hxx"
-#include "qdtree/qdtree_decl.hxx"
+#include "qdtree/qdtree.h"
 
 namespace qdtree
 {
@@ -26,8 +24,8 @@ namespace qdtree
 #define ILOG(i, x) LOG(indent(i) << x)
 #define ILOGLN(i, x) LOGLN(indent(i) << x)
 
-template <size_t D, typename T, typename U>
-void LOG_NODE_WRAPPED(const Node<D, T>* node,
+template <size_t D, typename O, typename U>
+void LOG_NODE_WRAPPED(const Node_Base<D, O>* node,
                       size_t i,
                       const std::array<U, D>& a,
                       const std::array<U, D>& b)
@@ -131,162 +129,6 @@ inline bool is_outside(const std::array<T, D>& c_lb,
     x = x || c_lb[i] > ub[i] || c_ub[i] < lb[i];
   }
   return x;
-}
-
-template <size_t D, typename T>
-print_node_data_manip<D, T>::print_node_data_manip(const Node<D, T>* node)
-  : node(node) {}
-
-template <size_t D, typename T>
-print_node_data_manip<D, T> print_node_data(const Node<D, T>* node) {
-  return print_node_data_manip<D, T>(node);
-}
-
-template <size_t D, typename T>
-std::ostream& operator<<(std::ostream& out, const print_node_data_manip<D, T>& m) {
-  out << "(";
-  std::copy(m.node->data().begin(), m.node->data().end(), infix_ostream_iterator<T>(out, "; "));
-  out << ")";
-  return out;
-}
-
-template <size_t D, typename O>
-inline Node_Base<D, O>::Node_Base()
-  : mChildren{}
-{}
-
-template <size_t D, typename O>
-inline Node_Base<D, O>::Node_Base(size_t i, O* child)
-  : mChildren{}
-{
-  mChildren[i] = child;
-}
-
-template <size_t D, typename O>
-inline O* Node_Base<D, O>::child(size_t i) const {
-  return mChildren[i];
-}
-
-template <size_t D, typename O>
-inline bool Node_Base<D, O>::leaf() const {
-  return std::all_of(mChildren.cbegin(),
-                     mChildren.cend(),
-                     [](const O* o){ return o == nullptr; });
-}
-
-template <size_t D, typename O>
-inline const typename Node_Base<D, O>::child_list_type&
-Node_Base<D, O>::children() const {
-  return mChildren;
-}
-
-template <size_t D, typename O>
-inline bool Node_Base<D, O>::has_siblings(size_t j) const {
-  for (size_t i = 0; i < D; ++i) {
-    if(i != j && mChildren[i] != nullptr) {
-      return true;
-    }
-  }
-  return false;
-}
-
-template <size_t D, typename O>
-inline void
-Node_Base<D, O>::addChild(size_t i, O* n) {
-  mChildren[i] = n;
-}
-
-template <size_t D, typename O>
-inline O*
-Node_Base<D, O>::removeChild(size_t i) {
-  O* n = mChildren[i];
-  mChildren[i] = nullptr;
-  return n;
-}
-
-template <size_t D, typename O>
-inline void Node_Base<D, O>::truncate() {
-  mChildren.fill(nullptr);
-}
-
-template <size_t D, typename O>
-inline void Node_Base<D, O>::setChild(size_t i, O* child) {
-  mChildren[i] = child;
-}
-
-template <size_t D, typename O>
-inline O*
-Node_Base<D, O>::firstChild() {
-  for(O* child : mChildren) {
-    if (child != nullptr) {
-      return child;
-    }
-  }
-
-  return nullptr;
-}
-
-template <size_t D, typename O>
-inline O*
-Node_Base<D, O>::lastChild() {
-  for(auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
-    if (*it) {
-      return *it;
-    }
-  }
-
-  return nullptr;
-}
-
-
-
-template <size_t D, typename T>
-inline Node<D, T>::Node()
-  : Node_Base<D, Node<D, T>>()
-  , mData()
-{}
-
-template <size_t D, typename T>
-inline Node<D, T>::Node(const Node<D, T>::value_type& d)
-  : Node_Base<D, Node<D, T>>()
-  , mData(1, d)
-{}
-
-template <size_t D, typename T>
-inline Node<D, T>::Node(size_t i, Node<D, T>* child)
-  : Node_Base<D, Node<D, T>>(i, child)
-  , mData()
-{}
-
-template <size_t D, typename T>
-inline Node<D, T>::Node(const Node &other)
-  : Node_Base<D, Node<D, T>>()
-  , mData(other.mData)
-{}
-
-template <size_t D, typename T>
-inline const std::list<T>& Node<D, T>::data() const {
-  return mData;
-}
-
-template <size_t D, typename T>
-inline std::list<T>& Node<D, T>::data() {
-  return mData;
-}
-
-template <size_t D, typename T>
-void Node<D, T>::addData(const T &data) {
-  mData.push_back(data);
-}
-
-template <size_t D, typename T>
-inline bool Node<D, T>::removeData(const T& data) {
-  auto it = std::find(mData.cbegin(), mData.cend(), data);
-  if (it != mData.cend()) {
-    mData.erase(it);
-    return true;
-  }
-  return false;
 }
 
 
@@ -966,7 +808,7 @@ QDTree<N, A, Allocator>::find_visitor(
     node_iterator_type& iterator,
     coord_value_type radius) const
 {
-  ConstNearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
+  ConstNearestNeighborVisitor<node_type, coord_value_type> visitor(target, radius);
   accept(&visitor, iterator);
   return visitor.getNearestNeighbor();
 }
@@ -977,7 +819,7 @@ QDTree<N, A, Allocator>::find_visitor(
     const coord_type& target,
     coord_value_type radius) const
 {
-  ConstNearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
+  ConstNearestNeighborVisitor<node_type, coord_value_type> visitor(target, radius);
   accept(&visitor);
   return visitor.getNearestNeighbor();
 }
@@ -989,7 +831,7 @@ QDTree<N, A, Allocator>::find_visitor(
     node_iterator_type& iterator,
     coord_value_type radius)
 {
-  NearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
+  NearestNeighborVisitor<node_type, coord_value_type> visitor(target, radius);
   accept(&visitor, iterator);
   return visitor.getNearestNeighbor();
 }
@@ -1001,44 +843,44 @@ QDTree<N, A, Allocator>::find_visitor(
     coord_value_type radius
     )
 {
-  NearestNeighborVisitor<node_type::dimension, value_type, coord_value_type> visitor(target, radius);
+  NearestNeighborVisitor<node_type, coord_value_type> visitor(target, radius);
   accept(&visitor);
   return visitor.getNearestNeighbor();
 }
 
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 inline void
-VisitorView<D, T, C>::clearQueue()
+VisitorView<N, C>::clearQueue()
 {
   mQueue.clear();
 }
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 inline void
-VisitorView<D, T, C>::queue(node_type* root,
-                             const coord_type& lb,
-                             const coord_type& ub)
+VisitorView<N, C>::queue(node_type* root,
+                         const coord_type& lb,
+                         const coord_type& ub)
 {
   mQueue.emplace_back(std::make_tuple(root, lb, ub));
 }
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 inline void
-VisitorView<D, T, C>::queue(node_type* node,
-                             const coord_type& lb,
-                             const coord_type& ub,
-                             const coord_type& m,
-                             size_t child_index)
+VisitorView<N, C>::queue(node_type* node,
+                         const coord_type& lb,
+                         const coord_type& ub,
+                         const coord_type& m,
+                         size_t child_index)
 {
   mQueue.emplace_back(node, lb, ub);
   auto& b = mQueue.back();
   compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
 }
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 inline void
-VisitorView<D, T, C>::queueChildren()
+VisitorView<N, C>::queueChildren()
 {
   const coord_type m = middle(lb, ub);
 
@@ -1053,9 +895,9 @@ VisitorView<D, T, C>::queueChildren()
   }
 }
 
-template <size_t D, typename T, typename C>
+template <typename N, typename C>
 inline void
-VisitorView<D, T, C>::queueChildren(size_t first)
+VisitorView<N, C>::queueChildren(size_t first)
 {
   const coord_type m = middle(lb, ub);
 
@@ -1075,14 +917,14 @@ VisitorView<D, T, C>::queueChildren(size_t first)
   }
 }
 
-template <size_t D, typename T, typename C>
-inline const Node<D, T>* VisitorView<D, T, C>::node() const
+template <typename N, typename C>
+inline const N* VisitorView<N, C>::node() const
 {
   return mNode;
 }
 
-template <size_t D, typename T, typename C>
-inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
+template <typename N, typename C>
+inline ConstNearestNeighborVisitor<N, C>::ConstNearestNeighborVisitor(
     const coord_type& target,
     coord_value_type radius)
   : mTarget(target)
@@ -1092,7 +934,7 @@ inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
   , mNearestNeighbor(nullptr)
 {
   if (std::isfinite(mRadius)) {
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < N::dimension; ++i) {
       mSearchLb[i] = mTarget[i] - mRadius;
       mSearchUb[i] = mTarget[i] + mRadius;
     }
@@ -1103,8 +945,8 @@ inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
   }
 }
 
-template <size_t D, typename T, typename C>
-inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
+template <typename N, typename C>
+inline ConstNearestNeighborVisitor<N, C>::ConstNearestNeighborVisitor(
     const coord_type& target)
   : mTarget(target)
   , mRadius(std::numeric_limits<coord_value_type>::max())
@@ -1116,8 +958,8 @@ inline ConstNearestNeighborVisitor<D, T, C>::ConstNearestNeighborVisitor(
   mSearchUb.fill(std::numeric_limits<coord_value_type>::max());
 }
 
-template <size_t D, typename T, typename C>
-void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
+template <typename N, typename C>
+void ConstNearestNeighborVisitor<N, C>::visit(view_type& it)
 {
   // Stop searching if this node can't contain a closer data.
   if (is_outside(it.lb(), it.ub(), mSearchLb, mSearchUb)) {
@@ -1133,7 +975,7 @@ void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
     LOGLN("Visiting point: " << print_coords(it.coords()));
 
     coord_value_type d2 = 0;
-    for(size_t i = 0; i < D; ++i) {
+    for(size_t i = 0; i < N::dimension; ++i) {
       coord_value_type d = it.coords()[i] - mTarget[i];
       d2 += d*d;
     }
@@ -1141,7 +983,7 @@ void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
     if (d2 < mRadius) {
       mRadius = d2;
       coord_value_type d = std::sqrt(d2);
-      for(size_t i = 0; i < D; ++i) {
+      for(size_t i = 0; i < N::dimension; ++i) {
         mSearchLb[i] = mTarget[i] - d;
         mSearchUb[i] = mTarget[i] + d;
       }
@@ -1157,31 +999,31 @@ void ConstNearestNeighborVisitor<D, T, C>::visit(view_type& it)
   return;
 }
 
-template <size_t D, typename T, typename C>
-const typename ConstNearestNeighborVisitor<D, T, C>::value_type*
-ConstNearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
+template <typename N, typename C>
+const typename ConstNearestNeighborVisitor<N, C>::value_type*
+ConstNearestNeighborVisitor<N, C>::getNearestNeighbor() const
 {
   return mNearestNeighbor;
 }
 
-template <size_t D, typename T, typename C>
-NearestNeighborVisitor<D, T, C>::NearestNeighborVisitor(
+template <typename N, typename C>
+NearestNeighborVisitor<N, C>::NearestNeighborVisitor(
     const coord_type& target,
     coord_value_type radius)
   : mImpl(target, radius) {}
 
 
-template <size_t D, typename T, typename C>
-void NearestNeighborVisitor<D, T, C>::visit(view_type& it)
+template <typename N, typename C>
+void NearestNeighborVisitor<N, C>::visit(view_type& it)
 {
   mImpl.visit(it.as_const);
 }
 
-template <size_t D, typename T, typename C>
-typename NearestNeighborVisitor<D, T, C>::value_type*
-NearestNeighborVisitor<D, T, C>::getNearestNeighbor() const
+template <typename N, typename C>
+typename NearestNeighborVisitor<N, C>::value_type*
+NearestNeighborVisitor<N, C>::getNearestNeighbor() const
 {
-  return const_cast<T*>(mImpl.getNearestNeighbor());
+  return const_cast<value_type*>(mImpl.getNearestNeighbor());
 }
 
 template <typename N, typename A, typename Allocator>
@@ -1251,18 +1093,6 @@ operator<<(
 #ifdef HAS_INSTR
 #undef LOG_NODE_WRAPPED
 #endif
-
-#define IMPLEMENT_QDTREE(dimension, type) \
-namespace qdtree { \
-  template \
-  class Node<dimension, type>; \
-  template \
-  class Node_Base<dimension, Node<dimension, type>>; \
-  template \
-  class QDTree<Node<dimension, type>>; \
-  template \
-  std::ostream& operator<<(std::ostream& out, const QDTree<Node<dimension, type>>& tree); \
-}
 
 } // namespace qdtree
 

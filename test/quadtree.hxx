@@ -3,7 +3,8 @@
 
 #include <array>
 #include <iosfwd>
-#include "qdtree/qdtree_decl.hxx"
+#include "qdtree/node.h"
+#include "qdtree/qdtree.h"
 
 using Point = std::array<double, 2>;
 

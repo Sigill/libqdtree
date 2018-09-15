@@ -1,7 +1,7 @@
 #ifndef MATCHERS_HXX
 #define MATCHERS_HXX
 
-#include "qdtree/qdtree_decl.hxx"
+#include "qdtree/qdtree.h"
 #include "gmock/gmock.h"
 
 #include <map>
