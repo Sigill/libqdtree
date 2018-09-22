@@ -2,8 +2,8 @@
 
 #include "quadtree.hxx"
 
-#include "qdtree/node.hxx"
 #include "qdtree/qdtree.hxx"
+#include "qdtree/singlenode.hxx"
 
 namespace std {
 inline std::ostream& operator<<(std::ostream& out, const Point& p) {
@@ -18,11 +18,11 @@ INSTANTIATE_EXTENT_MANIP(double)
 INSTANTIATE_EXTEND_MANIP_HELPER(double, 2)
 
 namespace qdtree {
-  template class Node_Base<2, Node<2, Point>>;
-  template class Node<2, Point>;
-  template class QDTree<Node<2, Point>>;
-  template std::ostream& operator<<(std::ostream& out, const QDTree<Node<2, Point>>& tree);
+  template class Node_Base<2, SingleNode<2, Point>>;
+  template class SingleNode<2, Point>;
+  template class QDTree<SingleNode<2, Point>>;
+  template std::ostream& operator<<(std::ostream& out, const QDTree<SingleNode<2, Point>>& tree);
 
-  template class VisitorView<Node<2, Point>, double>;
-  template class ConstNearestNeighborVisitor<Node<2, Point>, double>;
+  template class VisitorView<SingleNode<2, Point>, double>;
+  template class ConstNearestNeighborVisitor<SingleNode<2, Point>, double>;
 }

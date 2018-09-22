@@ -5,7 +5,6 @@
 #include "gmock/gmock.h"
 
 #include <map>
-#include <list>
 #include <regex>
 
 namespace qdtree {
@@ -166,7 +165,7 @@ class PointsMatcher : public MatcherInterface<const N*> {
 public:
   using node_type = N;
 
-  PointsMatcher(const Matcher<const typename node_type::value_list_type&>& matcher)
+  PointsMatcher(const Matcher<const typename node_type::data_type&>& matcher)
     : matcher(matcher) {}
 
   bool MatchAndExplain(const node_type* n, MatchResultListener* l) const override {
@@ -198,7 +197,7 @@ public:
     *os << "is NULL, has unexpected children or unexpected points";
   }
 private:
-  Matcher<const std::list<typename node_type::value_type>&> matcher;
+  Matcher<const typename node_type::data_type&> matcher;
 };
 
 template<typename N>
@@ -212,8 +211,13 @@ Matcher<const N*> PointsAre(const typename N::value_type& value) {
 }
 
 template<typename N>
-Matcher<const N*> PointsAre(const Matcher<const typename N::value_list_type&>& matcher) {
+Matcher<const N*> PointsAre(const Matcher<const typename N::data_type&>& matcher) {
   return MakeMatcher(new PointsMatcher<N>(matcher));
+}
+
+template<typename N>
+Matcher<const N*> PointIs(const typename N::value_type& value) {
+  return MakeMatcher(new PointsMatcher<N>(Pointee(value)));
 }
 
 } // namespace testing
@@ -233,7 +237,9 @@ Matcher<const N*> PointsAre(const Matcher<const typename N::value_list_type&>& m
   ::testing::Matcher<const typename Q::node_type*> \
   HasNoChildren() { \
     return ::qdtree::testing::HasNoChildren<typename Q::node_type>(); \
-  } \
+  }
+
+#define IMPORT_QDTREE_LISTNODE_MATCHERS_ALIASES(Q) \
   ::testing::Matcher<const typename Q::node_type*> \
   PointsAre(::std::initializer_list<typename Q::value_type> values) { \
     return ::qdtree::testing::PointsAre<typename Q::node_type>(values); \
@@ -243,8 +249,14 @@ Matcher<const N*> PointsAre(const Matcher<const typename N::value_list_type&>& m
     return ::qdtree::testing::PointsAre<typename Q::node_type>(value); \
   } \
   ::testing::Matcher<const typename Q::node_type*> \
-  PointsAre(const ::testing::Matcher<const typename Q::node_type::value_list_type&>& matcher) { \
+  PointsAre(const ::testing::Matcher<const typename Q::node_type::data_type&>& matcher) { \
     return ::qdtree::testing::PointsAre<typename Q::node_type>(matcher); \
+  }
+
+#define IMPORT_QDTREE_SINGLENODE_MATCHERS_ALIASES(Q) \
+  ::testing::Matcher<const typename Q::node_type*> \
+  PointIs(const typename Q::node_type::value_type& value) { \
+    return ::qdtree::testing::PointIs<typename Q::node_type>(value); \
   }
 
 // Those defines can also be used instead.

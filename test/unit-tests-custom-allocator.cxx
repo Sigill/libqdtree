@@ -2,7 +2,7 @@
 
 #include <array>
 
-#include "qdtree/node.hxx"
+#include "qdtree/listnode.hxx"
 #include "qdtree/qdtree.hxx"
 
 #include <foonathan/memory/memory_pool.hpp>
@@ -23,10 +23,10 @@ std::ostream& operator<<(std::ostream& out, const Point& p) {
 using Accessor = qdtree::BraketAccessor<Point, double>;
 
 using Allocator = foonathan::memory::std_allocator<
-  qdtree::Node<2, Point>,
+  qdtree::ListNode<2, Point>,
   foonathan::memory::memory_pool<>>;
 
-using Tree = qdtree::QDTree<qdtree::Node<2, Point>, Accessor, Allocator>;
+using Tree = qdtree::QDTree<qdtree::ListNode<2, Point>, Accessor, Allocator>;
 
 Tree::extent_type extent(const Tree::coord_type& lb,
                          const Tree::coord_type& ub) {
@@ -36,10 +36,11 @@ Tree::extent_type extent(const Tree::coord_type& lb,
 using namespace ::testing;
 
 IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
+IMPORT_QDTREE_LISTNODE_MATCHERS_ALIASES(Tree)
 
 TEST(QDTreeCustomAllocator, copy_ctor)
 {
-  foonathan::memory::memory_pool<> pool(sizeof(qdtree::Node<2, const Point *>), 4096);
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::ListNode<2, const Point *>), 4096);
   Allocator alloc(pool);
   Tree t(alloc);
   t.add({0.0, 0.0});
@@ -60,7 +61,7 @@ TEST(QDTreeCustomAllocator, copy_ctor)
 
 TEST(QDTreeCustomAllocator, move_ctor)
 {
-  foonathan::memory::memory_pool<> pool(sizeof(qdtree::Node<2, const Point *>), 4096);
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::ListNode<2, const Point *>), 4096);
   Allocator alloc(pool);
   Tree t(alloc);
   t.add({0.0, 0.0});
@@ -83,7 +84,7 @@ TEST(QDTreeCustomAllocator, move_ctor)
 
 TEST(QDTreeCustomAllocator, copy_op)
 {
-  foonathan::memory::memory_pool<> pool(sizeof(qdtree::Node<2, const Point *>), 4096);
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::ListNode<2, const Point *>), 4096);
   Allocator alloc(pool);
   Tree t(alloc);
   t.add({0.0, 0.0});
@@ -105,7 +106,7 @@ TEST(QDTreeCustomAllocator, copy_op)
 
 TEST(QDTreeCustomAllocator, move_op)
 {
-  foonathan::memory::memory_pool<> pool(sizeof(qdtree::Node<2, const Point *>), 4096);
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::ListNode<2, const Point *>), 4096);
   Allocator alloc(pool);
   Tree t(alloc);
   t.add({0.0, 0.0});

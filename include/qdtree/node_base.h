@@ -31,7 +31,7 @@ public:
 
   O* child(size_t i) const;
 
-  bool leaf() const;
+  bool isLeaf() const;
 
   const child_list_type& children() const;
 
@@ -52,6 +52,17 @@ public:
 protected:
   child_list_type mChildren;
 };
+
+
+template <typename N>
+struct print_node_data_manip
+{
+  const N* node;
+  print_node_data_manip(const N* node);
+};
+
+template <typename N>
+print_node_data_manip<N> print_node_data(const N* node);
 
 } // namespace qdtree
 

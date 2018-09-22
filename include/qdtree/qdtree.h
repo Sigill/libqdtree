@@ -33,71 +33,29 @@ struct BraketAccessor
 };
 
 
-
-template <typename N, typename C>
-class VisitorView;
-
 template <typename N,
           typename C>           // Integral coordinates type
 class ConstVisitorView
 {
-  using UnderlyingView = VisitorView<N, C>;
 public:
   using node_type = N;
-  using coord_type = std::array<C, N::dimension>;
-
-public:
-  ConstVisitorView(UnderlyingView &other)
-    : view(other)
-  {}
-
-  void clearQueue();
-  void queueChildren();
-  void queueChildren(size_t first);
-
-  const typename node_type::value_list_type* data() const
-  { return view.data; }
-
-  const coord_type& lb() const
-  { return view.lb; }
-
-  const coord_type& ub() const
-  { return view.ub; }
-
-  const coord_type& coords() const
-  { return view.coords; }
-
-private:
-  UnderlyingView& view;
-};
-
-
-template <typename N,
-          typename C>           // Integral coordinates type
-class VisitorView
-{
-public:
-  using node_type = N;
+  using value_type = typename node_type::value_type;
   using coord_value_type = C;
   using coord_type = std::array<C, N::dimension>;
   using QueueItem = std::tuple<node_type*, coord_type, coord_type>;
   using Queue = std::vector<QueueItem>;
 
-  typename node_type::value_list_type *data;
-  coord_type ub, lb, coords;
-
-  VisitorView()
-    : data(nullptr)
-    , ub()
-    , lb()
-    , coords()
+public:
+  ConstVisitorView()
+    : mQueue()
+    , mUb()
+    , mLb()
+    , mCoords()
     , mNode(nullptr)
-    , mQueue()
-    , as_const(*this)
   {}
 
-  VisitorView(size_t reserve)
-    : VisitorView()
+  ConstVisitorView(size_t reserve)
+    : ConstVisitorView()
   {
     mQueue.reserve(reserve);
   }
@@ -108,57 +66,75 @@ public:
 
     QueueItem& last = mQueue.back();
     mNode = std::get<0>(last);
-    lb   = std::move(std::get<1>(last));
-    ub   = std::move(std::get<2>(last));
-
-    data = &(mNode->data());
+    mLb   = std::move(std::get<1>(last));
+    mUb   = std::move(std::get<2>(last));
 
     mQueue.pop_back();
 
     return true;
   }
 
-  void clearQueue();
+  const coord_type& lb() const
+  { return mLb; }
+
+  const coord_type& ub() const
+  { return mUb; }
+
+  const coord_type& coords() const
+  { return mCoords; }
+
+  void clearQueue()
+  { mQueue.clear(); }
 
   void queue(node_type* root,
-             const coord_type& lb,
-             const coord_type& ub);
+             const coord_type& mLb,
+             const coord_type& mUb);
 
   void queue(node_type* mNode,
-             const coord_type& lb,
-             const coord_type& ub,
+             const coord_type& mLb,
+             const coord_type& mUb,
              const coord_type& m,
              size_t child_index);
   void queueChildren();
   void queueChildren(size_t first);
 
-  const node_type* node() const;
+  const node_type* node() const
+  { return mNode; }
+
+  bool isLeaf() const
+  { return mNode->isLeaf(); }
+
+  const typename node_type::data_pointer_type data() const
+  { return mNode->pointerToData(); }
+
+  const value_type& oneData() const
+  { return mNode->oneData(); }
 
 private:
-  node_type* mNode;
   Queue mQueue;
-
-public:
-  ConstVisitorView<N, C> as_const;
+protected:
+  coord_type mUb, mLb, mCoords;
+  node_type* mNode;
 };
 
-template <typename N, typename C>
-void ConstVisitorView<N, C>::clearQueue()
-{
-  view.clearQueue();
-}
 
-template <typename N, typename C>
-void ConstVisitorView<N, C>::queueChildren()
+template <typename N,
+          typename C>           // Integral coordinates type
+class VisitorView : public ConstVisitorView<N, C>
 {
-  view.queueChildren();
-}
+public:
+  using typename VisitorView::ConstVisitorView::node_type;
+  using typename VisitorView::ConstVisitorView::coord_type;
 
-template <typename N, typename C>
-void ConstVisitorView<N, C>::queueChildren(size_t first)
-{
-  view.queueChildren(first);
-}
+  using VisitorView::ConstVisitorView::ConstVisitorView;
+
+  coord_type& coords()
+  { return this->mCoords; }
+
+  typename node_type::data_pointer_type data()
+  { return this->mNode->pointerToData(); }
+};
+
 
 template <typename N,
           typename C>           // Integral coordinates type
@@ -194,13 +170,13 @@ public:
 
   void visit(view_type& it) override;
 
-  const value_type* getNearestNeighbor() const;
+  const typename node_type::data_pointer_type getNearestNeighbor() const;
 
 private:
   const coord_type mTarget;
   coord_value_type mRadius;
   coord_type mSearchLb, mSearchUb;
-  const value_type* mNearestNeighbor;
+  typename node_type::data_pointer_type mNearestNeighbor;
 };
 
 template <typename N, typename C>
@@ -218,7 +194,7 @@ public:
 
   void visit(view_type& it) override;
 
-  value_type* getNearestNeighbor() const;
+  typename node_type::data_pointer_type getNearestNeighbor() const;
 
 private:
   ConstNearestNeighborVisitor<N, C> mImpl;
@@ -303,21 +279,21 @@ public:
   void destroy_node(node_type* node);
 
 
-  const value_type* find(
+  const typename node_type::data_pointer_type find(
       const coord_type& target,
       node_iterator_type& iterator,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  value_type* find(
+  typename node_type::data_pointer_type find(
       const coord_type& target,
       node_iterator_type& iterator,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
-  const value_type* find(
+  const typename node_type::data_pointer_type find(
       const coord_type& target,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  value_type* find(
+  typename node_type::data_pointer_type find(
       const coord_type& target,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
@@ -333,27 +309,28 @@ public:
   void accept(visitor_type* visitor);
 
 
-  const value_type* find_visitor(
+  const typename node_type::data_pointer_type find_visitor(
       const coord_type& target,
       node_iterator_type& iterator,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  const value_type* find_visitor(
+  const typename node_type::data_pointer_type find_visitor(
       const coord_type& target,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity()) const;
 
-  value_type* find_visitor(
+  typename node_type::data_pointer_type find_visitor(
       const coord_type& target,
       node_iterator_type& iterator,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
-  value_type* find_visitor(
+  typename node_type::data_pointer_type find_visitor(
       const coord_type& target,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
 private:
   void add(const value_type& data, const coord_type &coord);
 };
+
 
 template <typename N, typename A, typename Allocator>
 std::ostream& operator<<(std::ostream& out, const QDTree<N, A, Allocator>& tree);

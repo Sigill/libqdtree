@@ -3,8 +3,8 @@
 
 #include <array>
 #include <iosfwd>
-#include "qdtree/node.h"
 #include "qdtree/qdtree.h"
+#include "qdtree/singlenode.h"
 
 using Point = std::array<double, 2>;
 
@@ -14,6 +14,6 @@ namespace std {
 std::ostream& operator<<(std::ostream& out, const Point& p);
 }
 
-using Tree = qdtree::QDTree<qdtree::Node<2, Point>>;
+using Tree = qdtree::QDTree<qdtree::SingleNode<2, Point>>;
 
 #endif // QUADTREE_HXX

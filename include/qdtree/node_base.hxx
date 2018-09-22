@@ -25,7 +25,7 @@ inline O* Node_Base<D, O>::child(size_t i) const {
 }
 
 template <size_t D, typename O>
-inline bool Node_Base<D, O>::leaf() const {
+inline bool Node_Base<D, O>::isLeaf() const {
   return std::all_of(mChildren.cbegin(),
                      mChildren.cend(),
                      [](const O* o){ return o == nullptr; });
@@ -93,6 +93,16 @@ Node_Base<D, O>::lastChild() {
   }
 
   return nullptr;
+}
+
+
+template <typename N>
+print_node_data_manip<N>::print_node_data_manip(const N* node)
+  : node(node) {}
+
+template <typename N>
+print_node_data_manip<N> print_node_data(const N* node) {
+  return print_node_data_manip<N>(node);
 }
 
 } // namespace qdtree

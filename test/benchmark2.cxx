@@ -1,4 +1,5 @@
-#include "qdtree/node.hxx"
+#include "qdtree/listnode.hxx"
+#include "qdtree/singlenode.hxx"
 #include "qdtree/qdtree.hxx"
 
 #include <vector>
@@ -86,15 +87,15 @@ struct XYRefAccessor {
   }
 };
 
-using VTree = qdtree::QDTree<qdtree::Node<2, my::Point>, XYRefAccessor>;
-using RTree = qdtree::QDTree<qdtree::Node<2, std::reference_wrapper<my::Point>>, XYRefAccessor>;
-using PTree = qdtree::QDTree<qdtree::Node<2, const my::Point*>, XYPointerAccessor>;
+using VTree = qdtree::QDTree<qdtree::ListNode<2, my::Point>, XYRefAccessor>;
+using RTree = qdtree::QDTree<qdtree::ListNode<2, std::reference_wrapper<my::Point>>, XYRefAccessor>;
+using PTree = qdtree::QDTree<qdtree::ListNode<2, const my::Point*>, XYPointerAccessor>;
 
 using FPAllocator = foonathan::memory::std_allocator<
   PTree::node_type,
   foonathan::memory::memory_pool<>>;
 
-using PFATree = qdtree::QDTree<qdtree::Node<2, const my::Point*>,
+using PFATree = qdtree::QDTree<qdtree::ListNode<2, const my::Point*>,
                                XYPointerAccessor,
                                FPAllocator>;
 
@@ -104,7 +105,7 @@ using BPAllocator =  boost::fast_pool_allocator<
     boost::details::pool::default_mutex
 >;
 
-using PBATree = qdtree::QDTree<qdtree::Node<2, const my::Point*>,
+using PBATree = qdtree::QDTree<qdtree::ListNode<2, const my::Point*>,
                                XYPointerAccessor,
                                BPAllocator>;
 
@@ -140,16 +141,16 @@ void value_bench(size_t N) {
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
-    my::Point* n = t.find({double(N-1), double(N-1)});
-    ensure(n != nullptr && *n == my::Point({double(N-1), double(N-1)}));
-    n->touch();
+    typename VTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && (*n).front() == my::Point({double(N-1), double(N-1)}));
+    (*n).front().touch();
   }
 
   {
-    const my::Point* n = static_cast<const VTree&>(t).find({0.0, 0.0});
-    ensure(n != nullptr && *n == my::Point({0.0, 0.0}));
+    const typename VTree::node_type::data_pointer_type n = static_cast<const VTree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && (*n).front() == my::Point({0.0, 0.0}));
     // Compile error, n is a pointer to a _constant Point_.
-    //n->touch();
+    //(*n).front().touch();
   }
 }
 
@@ -166,18 +167,18 @@ void reference_bench(size_t N) {
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
-    auto n = t.find({double(N-1), double(N-1)});
-    ensure(n != nullptr && &(n->get()) == &points.back());
-    n->get().touch();
-    *n = points.front();
+    typename RTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && &((*n).front().get()) == &points.back());
+    (*n).front().get().touch();
+    (*n).front() = points.front();
   }
 
   {
-    auto n = static_cast<const RTree&>(t).find({0.0, 0.0});
-    ensure(n != nullptr && n->get() == my::Point({0.0, 0.0}));
-    n->get().touch();
+    typename RTree::node_type::data_pointer_type n = static_cast<const RTree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && (*n).front().get() == my::Point({0.0, 0.0}));
+    (*n).front().get().touch();
     // Compile error, n is a pointer to a _constant reference_wrapper_.
-    //*n = points.front();
+    //(*n).front() = points.front();
   }
 
   // In both cases (const and non-const) it's possible to edit the retrieved
@@ -196,8 +197,8 @@ void pointer_bench(size_t N) {
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const my::Point **n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && *n == &points.back());
+  typename PTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
+  ensure(n != nullptr && (*n).front() == &points.back());
 
   //(*n)->setX(42);
   // Compile error, n is a pointer to a constant pointer to a _constant Point_.
@@ -220,8 +221,8 @@ void pointer_allocator_bench(size_t N) {
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const my::Point **n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && *n == &points.back());
+  typename PFATree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
+  ensure(n != nullptr && (*n).front() == &points.back());
 
   //(*n)->setX(42);
   // Compile error, n is a pointer to a constant pointer to a _constant Point_.
@@ -233,19 +234,57 @@ void pointer_boost_allocator_bench(size_t N) {
 
   auto begin = steady_clock::now();
 
-  PBATree t = make_tree<PBATree>(N);
+  {
+    PBATree t = make_tree<PBATree>(N);
 
-  for(my::Point& p : points)
-    t.unsafe_add(&p);
+    for(my::Point& p : points)
+      t.unsafe_add(&p);
+
+    std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
+
+    typename PBATree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && (*n).front() == &points.back());
+
+    //(*n)->setX(42);
+    // Compile error, n is a pointer to a constant pointer to a _constant Point_.
+    // It would compile with QDTree<_, Point*, _>.
+  }
+
+  boost::singleton_pool<
+      boost::fast_pool_allocator_tag,
+      56u,
+      boost::default_user_allocator_new_delete,
+      boost::details::pool::null_mutex,
+      32u,
+      0u>::purge_memory();
+}
+
+void single_value_bench(size_t N) {
+  auto points = make_points(N);
+
+  auto begin = steady_clock::now();
+
+  using Tree = qdtree::QDTree<qdtree::SingleNode<2, my::Point>, XYRefAccessor>;
+
+  Tree t = make_tree<Tree>(N);
+
+  for(const my::Point& p : points)
+    t.unsafe_add(p);
 
   std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
-  const my::Point **n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && *n == &points.back());
+  {
+    my::Point* n = t.find({double(N-1), double(N-1)});
+    ensure(n != nullptr && *n == my::Point({double(N-1), double(N-1)}));
+    n->touch();
+  }
 
-  //(*n)->setX(42);
-  // Compile error, n is a pointer to a constant pointer to a _constant Point_.
-  // It would compile with QDTree<_, Point*, _>.
+  {
+    const my::Point* n = static_cast<const Tree&>(t).find({0.0, 0.0});
+    ensure(n != nullptr && *n == my::Point({0.0, 0.0}));
+    // Compile error, n is a pointer to a _constant Point_.
+    //n->touch();
+  }
 }
 
 int main(int argc, char** argv)
@@ -255,7 +294,8 @@ int main(int argc, char** argv)
   {"reference"        , &reference_bench},
   {"pointer"          , &pointer_bench},
   {"pointer_allocator", &pointer_allocator_bench},
-  {"pointer_boost_allocator", &pointer_boost_allocator_bench}};
+  {"pointer_boost_allocator", &pointer_boost_allocator_bench},
+  {"single_value"     , &single_value_bench}};
 
 
   std::vector<std::string> to_run;

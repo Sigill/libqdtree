@@ -19,8 +19,10 @@ set(QDTREE_PUBLIC_HEADERS
   include/qdtree/infix_iterator.hxx
   include/qdtree/node_base.hxx
   include/qdtree/node_base.h
-  include/qdtree/node.hxx
-  include/qdtree/node.h
+  include/qdtree/singlenode.hxx
+  include/qdtree/singlenode.h
+  include/qdtree/listnode.hxx
+  include/qdtree/listnode.h
   include/qdtree/qdtree.h
   include/qdtree/qdtree.hxx
   include/qdtree/utils.h
