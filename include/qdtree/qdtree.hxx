@@ -45,7 +45,7 @@ void LOG_NODE_WRAPPED(const Node_Base<D, O>* node,
 #endif
 
 template <typename T, typename U>
-U BraketAccessor<T, U>::operator()(const T& v, const size_t i) const
+U BracketAccessor<T, U>::operator()(const T& v, const size_t i) const
 {
   return (U)v[i];
 }

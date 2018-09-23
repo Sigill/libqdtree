@@ -20,7 +20,7 @@ std::ostream& operator<<(std::ostream& out, const Point& p) {
 }
 }
 
-using Accessor = qdtree::BraketAccessor<Point, double>;
+using Accessor = qdtree::BracketAccessor<Point, double>;
 
 using Allocator = foonathan::memory::std_allocator<
   qdtree::ListNode<2, Point>,

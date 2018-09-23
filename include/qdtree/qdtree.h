@@ -25,7 +25,7 @@ class QDtree;
 
 
 template <typename T, typename U>
-struct BraketAccessor
+struct BracketAccessor
 {
   using value_type = U;
 
@@ -202,7 +202,7 @@ private:
 
 
 template <typename N, // Node type
-          typename A = BraketAccessor<typename N::value_type, double>,
+          typename A = BracketAccessor<typename N::value_type, double>,
           typename Allocator = std::allocator<N>>
 class QDTree
 {
