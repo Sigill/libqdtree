@@ -1,19 +1,100 @@
 #include "gmock/gmock.h"
-#include "quadtree.hxx"
+#include "qdtree/singlenode.hxx"
+#include "qdtree/listnode.hxx"
+#include "qdtree/qdtree.hxx"
 #include "matchers.hxx"
+#include <array>
 
-using namespace ::testing;
+#include <foonathan/memory/memory_pool.hpp>
+#include <foonathan/memory/std_allocator.hpp>
+
+namespace {
+
+using Point = std::array<double, 2>;
+
+namespace SingleTree {
+
+using Tree = qdtree::QDTree<qdtree::SingleNode<2, Point>>;
 
 IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
 IMPORT_QDTREE_SINGLENODE_MATCHERS_ALIASES(Tree)
 
-Tree::extent_type extent(const Tree::coord_type& lb,
-                         const Tree::coord_type& ub) {
+}
+
+namespace ListTree {
+
+using Tree = qdtree::QDTree<qdtree::ListNode<2, Point>>;
+
+IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
+IMPORT_QDTREE_LISTNODE_MATCHERS_ALIASES(Tree)
+
+}
+
+namespace FooTree {
+
+using Accessor = qdtree::BracketAccessor<Point, double>;
+
+using Allocator = foonathan::memory::std_allocator<
+  qdtree::SingleNode<2, Point>,
+  foonathan::memory::memory_pool<>>;
+
+using Tree = qdtree::QDTree<qdtree::SingleNode<2, Point>, Accessor, Allocator>;
+
+IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
+IMPORT_QDTREE_SINGLENODE_MATCHERS_ALIASES(Tree)
+
+}
+
+std::pair<std::array<double, 2>, std::array<double, 2>>
+extent(const std::array<double, 2>& lb, const std::array<double, 2>& ub) {
   return std::make_pair(lb, ub);
 }
 
+template <typename N, typename C>
+class TracedNearestNeighborVisitor
+    : public qdtree::ConstNearestNeighborVisitor<N, C>
+{
+public:
+  using Base = typename TracedNearestNeighborVisitor::ConstNearestNeighborVisitor;
+  using typename Base::view_type;
+  using typename Base::coord_type;
+  using typename Base::coord_value_type;
+  using visited_nodes_type = std::vector<std::pair<coord_type, coord_type>>;
+
+  TracedNearestNeighborVisitor(const coord_type& target,
+                               coord_value_type radius = std::numeric_limits<coord_value_type>::max())
+    : Base(target, radius)
+  {}
+
+  void visit(view_type& it) override {
+    mVisitedNodes.emplace_back(it.lb(), it.ub());
+    Base::visit(it);
+  }
+
+  const visited_nodes_type& visitedNodes() const {
+    return mVisitedNodes;
+  }
+
+private:
+  visited_nodes_type mVisitedNodes;
+};
+
+}
+
+// Since Point is effectively in the std namespace, operator<< has to be
+// defined here also.
+namespace std {
+inline std::ostream& operator<<(std::ostream& out, const Point& p) {
+  return out << qdtree::print_coords(p);
+}
+}
+
+using namespace ::testing;
+
 TEST(QDTree, cover_empty)
 {
+  using namespace SingleTree;
+
   Tree t;
   EXPECT_THAT(t, Root(IsNull()));
   EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {0.0, 0.0}));
@@ -38,6 +119,8 @@ TEST(QDTree, cover_empty)
 
 TEST(QDTree, cover_wrap)
 {
+  using namespace SingleTree;
+
   Tree t;
 
   // Extent will be initialized to floor/floor+1.
@@ -65,8 +148,10 @@ TEST(QDTree, cover_wrap)
                                       }})));
 }
 
-TEST(QDTree, add)
+TEST(QDTree, add_single)
 {
+  using namespace SingleTree;
+
   Tree t;
 
   t.add({0.0, 0.0});
@@ -136,6 +221,8 @@ TEST(QDTree, add)
 
 TEST(QDTree, remove)
 {
+  using namespace SingleTree;
+
   Tree t;
 
   t.add({0.0, 0.0});
@@ -207,8 +294,97 @@ TEST(QDTree, remove)
   EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
 }
 
+TEST(QDTree, add_remove_multi)
+{
+  using namespace ListTree;
+
+  Tree t;
+
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0}); t.add({1.0, 0.0});
+  t.add({0.5, 0.0}); t.add({0.5, 0.0});
+  // +---------+---------+ 1
+  // |         |         |
+  // |         |         |
+  // |         |         |
+  // +---------+----+----+ .5
+  // |         |    |    |
+  // |   0;0   +----+----+
+  // |         |.5;0| 1;0|
+  // +---------+----+----+ 0
+  // 0        .5         1
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({{0.5, 0.0}, {0.5, 0.0}})},
+                                         {1, PointsAre({{1.0, 0.0}, {1.0, 0.0}})}}
+                                       )}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({2.0, 0.0}); // Non existing point.
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({{0.5, 0.0}, {0.5, 0.0}})},
+                                         {1, PointsAre({{1.0, 0.0}, {1.0, 0.0}})}}
+                                       )}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({1.0, 0.0}); // One remain.
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, ChildrenMatch({
+                                         {0, PointsAre({{0.5, 0.0}, {0.5, 0.0}})},
+                                         {1, PointsAre({1.0, 0.0})}}
+                                       )}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({1.0, 0.0});
+  // Nodes will have collapsed.
+  // +---------+---------+ 1
+  // |         |         |
+  // |         |         |
+  // |         |         |
+  // +---------+---------+ .5
+  // |         |         |
+  // |   0;0   |  .5;0   |
+  // |         |         |
+  // +---------+---------+ 0
+  // 0        .5         1
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointsAre({0.0, 0.0})},
+                                      {1, PointsAre({{0.5, 0.0}, {0.5, 0.0}})}}
+                                    )));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({0.0, 0.0});
+  // Nodes will have collapsed.
+  // +---------+ 1
+  // |         |
+  // |  .5;0   |
+  // |         |
+  // +---------+ 0
+  // 0         1
+  EXPECT_THAT(t, Root(PointsAre({{0.5, 0.0}, {0.5, 0.0}})));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+
+  t.remove({0.5, 0.0});
+  EXPECT_THAT(t, Root(PointsAre({0.5, 0.0})));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+
+  t.remove({0.5, 0.0});
+  EXPECT_THAT(t, Root(IsNull()));
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+}
+
 TEST(QDTree, copy_ctor)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.add({0.0, 0.0});
   t.add({1.0, 0.0});
@@ -228,6 +404,8 @@ TEST(QDTree, copy_ctor)
 
 TEST(QDTree, move_ctor)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.add({0.0, 0.0});
   t.add({1.0, 0.0});
@@ -249,6 +427,8 @@ TEST(QDTree, move_ctor)
 
 TEST(QDTree, copy_op)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.add({0.0, 0.0});
   t.add({1.0, 0.0});
@@ -268,6 +448,8 @@ TEST(QDTree, copy_op)
 
 TEST(QDTree, move_op)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.add({0.0, 0.0});
   t.add({1.0, 0.0});
@@ -289,6 +471,8 @@ TEST(QDTree, move_op)
 
 TEST(QDTree, find)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.cover({0.0, 0.0});
   t.cover({5.0, 5.0});
@@ -309,37 +493,10 @@ TEST(QDTree, find)
   ASSERT_EQ(*n2, Point({4.0, 4.0}));
 }
 
-template <typename N, typename C>
-class TracedNearestNeighborVisitor
-    : public qdtree::ConstNearestNeighborVisitor<N, C>
-{
-public:
-  using Base = typename TracedNearestNeighborVisitor::ConstNearestNeighborVisitor;
-  using typename Base::view_type;
-  using typename Base::coord_type;
-  using typename Base::coord_value_type;
-  using visited_nodes_type = std::vector<std::pair<coord_type, coord_type>>;
-
-  TracedNearestNeighborVisitor(const coord_type& target,
-                               coord_value_type radius = std::numeric_limits<coord_value_type>::max())
-    : Base(target, radius)
-  {}
-
-  void visit(view_type& it) override {
-    mVisitedNodes.emplace_back(it.lb(), it.ub());
-    Base::visit(it);
-  }
-
-  const visited_nodes_type& visitedNodes() const {
-    return mVisitedNodes;
-  }
-
-private:
-  visited_nodes_type mVisitedNodes;
-};
-
 TEST(QDTree, find_visitor)
 {
+  using namespace SingleTree;
+
   Tree t;
   t.cover({0.0, 0.0});
   t.cover({5.0, 5.0});
@@ -366,3 +523,100 @@ TEST(QDTree, find_visitor)
   EXPECT_THAT(visitor.visitedNodes(), ElementsAreArray(nodes));
 }
 
+TEST(QDTree, copy_ctor_foo_allocator)
+{
+  using namespace FooTree;
+
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::SingleNode<2, const Point *>), 4096);
+  Allocator alloc(pool);
+  Tree t(alloc);
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointIs({0.0, 0.0})},
+                                      {1, PointIs({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(t);
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointIs({0.0, 0.0})},
+                                       {1, PointIs({1.0, 0.0})}}
+                                     )));
+}
+
+TEST(QDTree, move_ctor_foo_allocator)
+{
+  using namespace FooTree;
+
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::SingleNode<2, const Point *>), 4096);
+  Allocator alloc(pool);
+  Tree t(alloc);
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointIs({0.0, 0.0})},
+                                      {1, PointIs({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(std::move(t));
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointIs({0.0, 0.0})},
+                                       {1, PointIs({1.0, 0.0})}}
+                                     )));
+
+  EXPECT_THAT(t, Root(IsNull()));
+}
+
+TEST(QDTree, copy_op_foo_allocator)
+{
+  using namespace FooTree;
+
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::SingleNode<2, const Point *>), 4096);
+  Allocator alloc(pool);
+  Tree t(alloc);
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointIs({0.0, 0.0})},
+                                      {1, PointIs({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(alloc);
+  t2 = t;
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                      {0, PointIs({0.0, 0.0})},
+                                      {1, PointIs({1.0, 0.0})}}
+                                    )));
+}
+
+TEST(QDTree, move_op_foo_allocator)
+{
+  using namespace FooTree;
+
+  foonathan::memory::memory_pool<> pool(sizeof(qdtree::SingleNode<2, const Point *>), 4096);
+  Allocator alloc(pool);
+  Tree t(alloc);
+  t.add({0.0, 0.0});
+  t.add({1.0, 0.0});
+  EXPECT_EQ(t.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t, Root(ChildrenMatch({
+                                      {0, PointIs({0.0, 0.0})},
+                                      {1, PointIs({1.0, 0.0})}}
+                                    )));
+
+  Tree t2(alloc);
+  t2 = std::move(t);
+  EXPECT_EQ(t2.extent(), extent({0.0, 0.0}, {1.0, 1.0}));
+  EXPECT_THAT(t2, Root(ChildrenMatch({
+                                       {0, PointIs({0.0, 0.0})},
+                                       {1, PointIs({1.0, 0.0})}}
+                                     )));
+
+  EXPECT_THAT(t, Root(IsNull()));
+}

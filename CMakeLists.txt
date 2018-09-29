@@ -120,16 +120,11 @@ if(BUILD_TESTING)
 
   add_executable(unit-tests test/unit-tests.cxx)
   target_link_libraries(unit-tests
-    PRIVATE quadtree ${GMOCK_MAIN_LIBRARIES} Threads::Threads)
-  gtest_add_tests(unit-tests "" AUTO)
-
-  add_executable(unit-tests-custom-allocator test/unit-tests-custom-allocator.cxx)
-  target_link_libraries(unit-tests-custom-allocator
-    PRIVATE qdtree
+    PRIVATE quadtree
             ${GMOCK_MAIN_LIBRARIES}
             Threads::Threads
             foonathan_memory)
-  gtest_add_tests(unit-tests-custom-allocator "" AUTO)
+  gtest_add_tests(unit-tests "" AUTO)
 
   add_executable(benchmark test/benchmark.cxx)
   target_link_libraries(benchmark

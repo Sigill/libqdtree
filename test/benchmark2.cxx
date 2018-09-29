@@ -205,7 +205,7 @@ void pointer_bench(size_t N) {
   // It would compile with QDTree<_, Point*, _>.
 }
 
-void pointer_allocator_bench(size_t N) {
+void pointer_foo_allocator_bench(size_t N) {
   auto points = make_points(N);
 
   auto begin = steady_clock::now();
@@ -290,12 +290,12 @@ void single_value_bench(size_t N) {
 int main(int argc, char** argv)
 {
   const std::map<std::string, std::function<void(size_t)>> available_tests = {
-  {"value"            , &value_bench},
-  {"reference"        , &reference_bench},
-  {"pointer"          , &pointer_bench},
-  {"pointer_allocator", &pointer_allocator_bench},
+  {"value"                  , &value_bench},
+  {"reference"              , &reference_bench},
+  {"pointer"                , &pointer_bench},
+  {"pointer_foo_allocator"  , &pointer_foo_allocator_bench},
   {"pointer_boost_allocator", &pointer_boost_allocator_bench},
-  {"single_value"     , &single_value_bench}};
+  {"single_value"           , &single_value_bench}};
 
 
   std::vector<std::string> to_run;
