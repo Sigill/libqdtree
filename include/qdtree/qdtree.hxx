@@ -552,7 +552,7 @@ inline typename QDTree<N, A, Allocator>::node_type*
 QDTree<N, A, Allocator>::allocate_node(const typename node_type::value_type& d)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
-  new(n) node_type(d);
+  allocator_traits::construct(mAllocator, n, d);
   return n;
 }
 
@@ -562,7 +562,7 @@ inline typename QDTree<N, A, Allocator>::node_type*
 QDTree<N, A, Allocator>::allocate_node(size_t i, node_type* child)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
-  new(n) node_type(i, child);
+  allocator_traits::construct(mAllocator, n, i, child);
   return n;
 }
 
@@ -571,7 +571,7 @@ inline typename QDTree<N, A, Allocator>::node_type*
 QDTree<N, A, Allocator>::allocate_node(const node_type& other)
 {
   node_type* n = allocator_traits::allocate(mAllocator, 1u);
-  new(n) node_type(other);
+  allocator_traits::construct(mAllocator, n, other);
   return n;
 }
 
@@ -627,7 +627,7 @@ void QDTree<N, A, Allocator>::destroy_node(node_type* node)
         nodes.push_back(child);
     }
 
-    node->~node_type();
+    allocator_traits::destroy(mAllocator, node);
     allocator_traits::deallocate(mAllocator, node, 1u);
   }
 }
