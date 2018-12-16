@@ -3,8 +3,6 @@ project(QDTree)
 
 set(QDTREE_VERSION "0.1.0")
 
-SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
-
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -84,8 +82,7 @@ install(FILES
 include(CTest)
 
 if(BUILD_TESTING)
-  find_package(GTest REQUIRED)
-  find_package(GMock REQUIRED)
+  find_package(GTest REQUIRED NO_MODULE) # Use NO_MODULE to use GTestConfig.cmake instead of FindGTest.cmake
   find_package(Boost COMPONENTS program_options REQUIRED)
   find_package(foonathan_memory REQUIRED)
 
@@ -121,10 +118,10 @@ if(BUILD_TESTING)
   add_executable(unit-tests test/unit-tests.cxx)
   target_link_libraries(unit-tests
     PRIVATE quadtree
-            ${GMOCK_MAIN_LIBRARIES}
+            GTest::gmock_main
             Threads::Threads
             foonathan_memory)
-  gtest_add_tests(unit-tests "" AUTO)
+  add_test(unit-tests unit-tests)
 
   add_executable(benchmark test/benchmark.cxx)
   target_link_libraries(benchmark
