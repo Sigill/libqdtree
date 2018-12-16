@@ -3,13 +3,10 @@
 #include "qdtree/qdtree.hxx"
 
 #include <vector>
-#include <chrono>
-#include <iostream>
-#include <functional>
 #include <cstdlib>
 #include <cstdio>
 
-#include <boost/program_options.hpp>
+#include <benchmark/benchmark.h>
 
 #include <foonathan/memory/memory_pool.hpp>
 #include <foonathan/memory/std_allocator.hpp>
@@ -17,20 +14,10 @@
 #define BOOST_POOL_NO_MT
 #include <boost/pool/pool_alloc.hpp>
 
-#include "rang.hpp"
-
 // The purpose of this test is:
 // - to verify that it is possible to build a QDTree of values,
 // references and pointers.
 // - to evaluate the impact of allocators.
-
-using namespace std::chrono;
-namespace po = boost::program_options;
-
-template<typename TypeT = milliseconds>
-auto elapsed(const steady_clock::time_point& begin) {
-  return duration_cast<TypeT>(steady_clock::now() - begin).count();
-}
 
 void _ensure(const char* expression, const char* file, int line)
 {
@@ -128,17 +115,22 @@ std::vector<my::Point> make_points(size_t N) {
   return points;
 }
 
-void value_bench(size_t N) {
+void bm_value(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
   auto points = make_points(N);
 
-  auto begin = steady_clock::now();
+  for (auto _ : state)
+  {
+    VTree t = make_tree<VTree>(N);
+    for(const my::Point& p : points)
+      t.unsafe_add(p);
+  }
 
   VTree t = make_tree<VTree>(N);
-
   for(const my::Point& p : points)
     t.unsafe_add(p);
-
-  std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
     typename VTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
@@ -153,18 +145,24 @@ void value_bench(size_t N) {
     //(*n).front().touch();
   }
 }
+BENCHMARK(bm_value)->Arg(10)->Arg(25)->Arg(50);
 
-void reference_bench(size_t N) {
+void bm_ref(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
   auto points = make_points(N);
 
-  auto begin = steady_clock::now();
+  for (auto _ : state)
+  {
+    RTree t = make_tree<RTree>(N);
+    for(my::Point& p : points)
+      t.unsafe_add(p);
+  }
 
   RTree t = make_tree<RTree>(N);
-
   for(my::Point& p : points)
     t.unsafe_add(p);
-
-  std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
     typename RTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
@@ -184,18 +182,24 @@ void reference_bench(size_t N) {
   // In both cases (const and non-const) it's possible to edit the retrieved
   // Point. Use std::reference_wrapper<const Point> to prevent it.
 }
+BENCHMARK(bm_ref)->Arg(10)->Arg(25)->Arg(50);
 
-void pointer_bench(size_t N) {
+void bm_pointer(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
   auto points = make_points(N);
 
-  auto begin = steady_clock::now();
+  for (auto _ : state)
+  {
+    PTree t = make_tree<PTree>(N);
+    for(my::Point& p : points)
+      t.unsafe_add(&p);
+  }
 
   PTree t = make_tree<PTree>(N);
-
   for(my::Point& p : points)
     t.unsafe_add(&p);
-
-  std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   typename PTree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
   ensure(n != nullptr && (*n).front() == &points.back());
@@ -204,74 +208,74 @@ void pointer_bench(size_t N) {
   // Compile error, n is a pointer to a constant pointer to a _constant Point_.
   // It would compile with QDTree<_, Point*, _>.
 }
+BENCHMARK(bm_pointer)->Arg(10)->Arg(25)->Arg(50);
 
-void pointer_foo_allocator_bench(size_t N) {
+void bm_pointer_foo_allocator(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
   auto points = make_points(N);
 
-  auto begin = steady_clock::now();
-
-  foonathan::memory::memory_pool<> pool(sizeof(PTree::node_type), 4096);
-  FPAllocator alloc(pool);
-  PFATree t(alloc);
-  t.cover({0.0, 0.0});
-  t.cover({double(N), double(N)});
-
-  for(my::Point& p : points)
-    t.unsafe_add(&p);
-
-  std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
-
-  typename PFATree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
-  ensure(n != nullptr && (*n).front() == &points.back());
-
-  //(*n)->setX(42);
-  // Compile error, n is a pointer to a constant pointer to a _constant Point_.
-  // It would compile with QDTree<_, Point*, _>.
-}
-
-void pointer_boost_allocator_bench(size_t N) {
-  auto points = make_points(N);
-
-  auto begin = steady_clock::now();
-
+  for (auto _ : state)
   {
-    PBATree t = make_tree<PBATree>(N);
+    foonathan::memory::memory_pool<> pool(sizeof(PTree::node_type), 4096);
+    FPAllocator alloc(pool);
+    PFATree t(alloc);
+    t.cover({0.0, 0.0});
+    t.cover({double(N), double(N)});
 
     for(my::Point& p : points)
       t.unsafe_add(&p);
-
-    std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
-
-    typename PBATree::node_type::data_pointer_type n = t.find({double(N-1), double(N-1)});
-    ensure(n != nullptr && (*n).front() == &points.back());
-
-    //(*n)->setX(42);
-    // Compile error, n is a pointer to a constant pointer to a _constant Point_.
-    // It would compile with QDTree<_, Point*, _>.
   }
-
-  boost::singleton_pool<
-      boost::fast_pool_allocator_tag,
-      56u,
-      boost::default_user_allocator_new_delete,
-      boost::details::pool::null_mutex,
-      32u,
-      0u>::purge_memory();
 }
+BENCHMARK(bm_pointer_foo_allocator)->Arg(10)->Arg(25)->Arg(50);
 
-void single_value_bench(size_t N) {
+void bm_pointer_boost_allocator(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
   auto points = make_points(N);
 
-  auto begin = steady_clock::now();
+  for (auto _ : state)
+  {
+    {
+      PBATree t = make_tree<PBATree>(N);
+
+      for(my::Point& p : points)
+        t.unsafe_add(&p);
+    }
+
+    boost::singleton_pool<
+        boost::fast_pool_allocator_tag,
+        56u,
+        boost::default_user_allocator_new_delete,
+        boost::details::pool::null_mutex,
+        32u,
+        0u>::purge_memory();
+  }
+}
+BENCHMARK(bm_pointer_boost_allocator)->Arg(10)->Arg(25)->Arg(50);
+
+void bm_single_value(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  auto points = make_points(N);
 
   using Tree = qdtree::QDTree<qdtree::SingleNode<2, my::Point>, XYRefAccessor>;
+
+  for (auto _ : state)
+  {
+    Tree t = make_tree<Tree>(N);
+
+    for(const my::Point& p : points)
+      t.unsafe_add(p);
+  }
 
   Tree t = make_tree<Tree>(N);
 
   for(const my::Point& p : points)
     t.unsafe_add(p);
-
-  std::cout << "Construction: " << elapsed(begin) << " ms" << std::endl;
 
   {
     my::Point* n = t.find({double(N-1), double(N-1)});
@@ -286,69 +290,6 @@ void single_value_bench(size_t N) {
     //n->touch();
   }
 }
+BENCHMARK(bm_single_value)->Arg(10)->Arg(25)->Arg(50);
 
-int main(int argc, char** argv)
-{
-  const std::map<std::string, std::function<void(size_t)>> available_tests = {
-  {"value"                  , &value_bench},
-  {"reference"              , &reference_bench},
-  {"pointer"                , &pointer_bench},
-  {"pointer_foo_allocator"  , &pointer_foo_allocator_bench},
-  {"pointer_boost_allocator", &pointer_boost_allocator_bench},
-  {"single_value"           , &single_value_bench}};
-
-
-  std::vector<std::string> to_run;
-  size_t size;
-
-  po::options_description options("Command line parameters");
-  options.add_options()
-      ("help,h", "Produce help message.")
-      ("list,l", "List available benchmarks.")
-      ("run,r", po::value<std::vector<std::string>>(&to_run)->multitoken(), "")
-      ("size,s", po::value<size_t>(&size)->default_value(50), "");
-
-  po::variables_map vm;
-
-  po::store(po::command_line_parser(argc, argv).options(options).run(), vm);
-
-  if (vm.count("help")) {
-    std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
-    std::cout << options;
-    return -1;
-  }
-
-  if (vm.count("list")) {
-    std::cout << "Available tests:" << std::endl;
-    for(const auto& test : available_tests)
-      std::cout << test.first << std::endl;
-    return 0;
-  }
-
-  po::notify(vm);
-
-  if (to_run.empty()) {
-    for(const auto& test : available_tests)
-      to_run.push_back(test.first);
-  } else {
-    for(const auto& test_name : to_run)
-      if (available_tests.count(test_name) == 0) {
-        std::cerr << "Unknown test: " << test_name << std::endl;
-        return -1;
-      }
-  }
-
-  for(const auto& test_name : to_run) {
-    const auto& test = available_tests.find(test_name);
-    std::cout << "Running: "
-              << rang::fg::green << test_name << rang::style::reset
-              << std::endl;
-    auto begin = steady_clock::now();
-
-    test->second(size);
-
-    std::cout << "Total time: " << elapsed(begin) << " ms" << std::endl;
-  }
-
-  return 0;
-}
+BENCHMARK_MAIN();

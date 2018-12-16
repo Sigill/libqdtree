@@ -1,26 +1,10 @@
 #include "quadtree.hxx"
 
-#include <string>
 #include <vector>
-#include <map>
-#include <chrono>
-#include <iostream>
-#include <functional>
 #include <cstdlib>
 #include <cstdio>
 
-#include <boost/program_options.hpp>
-
-#include "rang.hpp"
-
-using namespace std::chrono;
-namespace po = boost::program_options;
-
-template<typename TypeT = milliseconds>
-auto elapsed(const steady_clock::time_point& begin,
-             const steady_clock::time_point& end) {
-  return duration_cast<TypeT>(end - begin).count();
-}
+#include <benchmark/benchmark.h>
 
 void _ensure(const char* expression, const char* file, int line)
 {
@@ -30,40 +14,47 @@ void _ensure(const char* expression, const char* file, int line)
 
 #define ensure(EXPRESSION) ((EXPRESSION) ? (void)0 : _ensure(#EXPRESSION, __FILE__, __LINE__))
 
-void add_bench(size_t N)
+void bm_add_safe(benchmark::State& state)
 {
-  auto begin = steady_clock::now();
+  size_t N = state.range(0);
 
-  Tree t1;
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      t1.add({(double)x, (double)y});
+  for (auto _ : state)
+  {
+    Tree t;
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        t.add({(double)x, (double)y});
+      }
     }
   }
-
-  auto add_end = steady_clock::now();
-
-  Tree t2;
-  t2.cover({0.0, 0.0});
-  t2.cover({(double)N, (double)N});
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      t2.unsafe_add({(double)x, (double)y});
-    }
-  }
-
-  auto unsafe_add_end = steady_clock::now();
-
-  std::cout << "Safe add: " << elapsed(begin, add_end) << " ms" << std::endl;
-  std::cout << "Unsafe add: " << elapsed(add_end, unsafe_add_end) << " ms" << std::endl;
 }
+BENCHMARK(bm_add_safe)->Arg(10);
 
-void find_vector_bench(size_t N)
+void bm_add_unsafe(benchmark::State& state)
 {
-  auto begin = steady_clock::now();
+  size_t N = state.range(0);
+
+  for (auto _ : state)
+  {
+    Tree t;
+    t.cover({0.0, 0.0});
+    t.cover({(double)N, (double)N});
+
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        t.unsafe_add({(double)x, (double)y});
+      }
+    }
+  }
+}
+BENCHMARK(bm_add_unsafe)->Arg(10);
+
+void bm_find_vector(benchmark::State& state)
+{
+  size_t N = state.range(0);
 
   std::vector<Tree::coord_type> v;
+  v.reserve(N*N);
   for(size_t y = 0; y < N; ++y) {
     for(size_t x = 0; x < N; ++x) {
       Tree::coord_type s = {(double)x, (double)y};
@@ -71,33 +62,30 @@ void find_vector_bench(size_t N)
     }
   }
 
-  auto build_end = steady_clock::now();
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        const Tree::coord_type* closest = nullptr;
+        double dist = std::numeric_limits<double>::max();
 
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      const Tree::coord_type* closest = nullptr;
-      double dist = std::numeric_limits<double>::max();
+        for(const auto& p : v) {
+          double d = (x - p[0]) * (x - p[0]) + (y - p[1]) * (y - p[1]);
+          if (d < dist) {
+            dist = d;
+            closest = &p;
 
-      for(const auto& p : v) {
-        double d = (x - p[0]) * (x - p[0]) + (y - p[1]) * (y - p[1]);
-        if (d < dist) {
-          dist = d;
-          closest = &p;
-
-          if (dist <= 0)
-            break;
+            if (dist <= 0)
+              break;
+          }
         }
-      }
 
-      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+      }
     }
   }
-
-  auto search_end = steady_clock::now();
-
-  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
-  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
 }
+BENCHMARK(bm_find_vector)->Arg(10)->Arg(25)->Arg(50);
 
 Tree build_tree(size_t N)
 {
@@ -113,157 +101,81 @@ Tree build_tree(size_t N)
   return t;
 }
 
-void find_bench(size_t N)
+void bm_find(benchmark::State& state)
 {
-  auto begin = steady_clock::now();
+  size_t N = state.range(0);
 
   Tree t = build_tree(N);
 
-  auto build_end = steady_clock::now();
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      auto closest = t.find({(double)x, (double)y});
-      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
-    }
-  }
-
-  auto search_end = steady_clock::now();
-
-  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
-  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
-}
-
-void find_external_iterator_bench(size_t N)
-{
-  auto begin = steady_clock::now();
-
-  Tree t = build_tree(N);
-
-  auto build_end = steady_clock::now();
-
-  Tree::node_iterator_type it;
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      auto closest = static_cast<const Tree&>(t).find({(double)x, (double)y}, it);
-      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
-    }
-  }
-
-  auto search_end = steady_clock::now();
-
-  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
-  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
-}
-
-void find_visitor_bench(size_t N)
-{
-  auto begin = steady_clock::now();
-
-  Tree t = build_tree(N);
-
-  auto build_end = steady_clock::now();
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      Tree::coord_type target = {(double)x, (double)y};
-      auto closest = static_cast<const Tree&>(t).find_visitor(target);
-      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
-    }
-  }
-
-  auto search_end = steady_clock::now();
-
-  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
-  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
-}
-
-void find_visitor_external_iterator_bench(size_t N)
-{
-  auto begin = steady_clock::now();
-
-  Tree t = build_tree(N);
-
-  auto build_end = steady_clock::now();
-
-  Tree::node_iterator_type it;
-
-  for(size_t y = 0; y < N; ++y) {
-    for(size_t x = 0; x < N; ++x) {
-      Tree::coord_type target = {(double)x, (double)y};
-      auto closest = static_cast<const Tree&>(t).find_visitor(target, it);
-      ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
-    }
-  }
-
-  auto search_end = steady_clock::now();
-
-  std::cout << "Construction: " << elapsed(begin, build_end) << " ms" << std::endl;
-  std::cout << "Search: " << elapsed(build_end, search_end) << " ms" << std::endl;
-}
-
-int main(int argc, char** argv)
-{
-  const std::map<std::string, std::function<void(size_t)>> available_tests = {
-  {"add"                           , &add_bench},
-  {"find_vector"                   , &find_vector_bench},
-  {"find"                          , &find_bench},
-  {"find_external_iterator"        , &find_external_iterator_bench},
-  {"find_visitor"                  , &find_visitor_bench},
-  {"find_visitor_external_iterator", &find_visitor_external_iterator_bench}};
-
-  std::vector<std::string> to_run;
-  size_t size;
-
-  po::options_description options("Command line parameters");
-  options.add_options()
-      ("help,h", "Produce help message.")
-      ("list,l", "List available benchmarks.")
-      ("run,r", po::value<std::vector<std::string>>(&to_run)->multitoken(), "")
-      ("size,s", po::value<size_t>(&size)->default_value(50), "");
-
-  po::variables_map vm;
-
-  po::store(po::command_line_parser(argc, argv).options(options).run(), vm);
-
-  if (vm.count("help")) {
-    std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
-    std::cout << options;
-    return -1;
-  }
-
-  if (vm.count("list")) {
-    std::cout << "Available tests:" << std::endl;
-    for(const auto& test : available_tests)
-      std::cout << test.first << std::endl;
-    return 0;
-  }
-
-  po::notify(vm);
-
-  if (to_run.empty()) {
-    for(const auto& test : available_tests)
-      to_run.push_back(test.first);
-  } else {
-    for(const auto& test_name : to_run)
-      if (available_tests.count(test_name) == 0) {
-        std::cerr << "Unknown test: " << test_name << std::endl;
-        return -1;
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        auto closest = t.find({(double)x, (double)y});
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
       }
+    }
   }
-
-  for(const auto& test_name : to_run) {
-    const auto& test = available_tests.find(test_name);
-    std::cout << "Running: "
-              << rang::fg::green << test_name << rang::style::reset
-              << std::endl;
-    auto begin = steady_clock::now();
-
-    test->second(size);
-
-    std::cout << "Total time: " << elapsed(begin, steady_clock::now()) << " ms" << std::endl;
-  }
-
-  return 0;
 }
+BENCHMARK(bm_find)->Arg(10)->Arg(25)->Arg(50);
+
+
+void bm_find_external_iterator(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  Tree t = build_tree(N);
+  Tree::node_iterator_type it;
+
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        auto closest = static_cast<const Tree&>(t).find({(double)x, (double)y}, it);
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+      }
+    }
+  }
+}
+BENCHMARK(bm_find_external_iterator)->Arg(10)->Arg(25)->Arg(50);
+
+void bm_find_visitor(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  Tree t = build_tree(N);
+
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        Tree::coord_type target = {(double)x, (double)y};
+        auto closest = static_cast<const Tree&>(t).find_visitor(target);
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+      }
+    }
+  }
+}
+BENCHMARK(bm_find_visitor)->Arg(10)->Arg(25)->Arg(50);
+
+void bm_find_visitor_external_iterator(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  Tree t = build_tree(N);
+  Tree::node_iterator_type it;
+
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        Tree::coord_type target = {(double)x, (double)y};
+        auto closest = static_cast<const Tree&>(t).find_visitor(target, it);
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+      }
+    }
+  }
+}
+BENCHMARK(bm_find_visitor_external_iterator)->Arg(10)->Arg(25)->Arg(50);
+
+BENCHMARK_MAIN();

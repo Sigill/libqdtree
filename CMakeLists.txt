@@ -85,27 +85,7 @@ if(BUILD_TESTING)
   find_package(GTest REQUIRED NO_MODULE) # Use NO_MODULE to use GTestConfig.cmake instead of FindGTest.cmake
   find_package(Boost COMPONENTS program_options REQUIRED)
   find_package(foonathan_memory REQUIRED)
-
-  include(ExternalProject)
-
-  set(RANG_ROOT ${CMAKE_BINARY_DIR}/thirdparty/rang)
-
-  ExternalProject_Add(rang_external
-                      PREFIX ${RANG_ROOT}
-                      GIT_REPOSITORY "https://github.com/agauniyal/rang.git"
-                      GIT_TAG "49505595c6941ad58788ade0ecdff26aeb5b7a9a"
-                      CONFIGURE_COMMAND ""
-                      BUILD_COMMAND ""
-                      INSTALL_COMMAND "")
-
-  ExternalProject_Get_Property(rang_external SOURCE_DIR)
-  set(RANG_INCLUDE_DIR ${SOURCE_DIR}/include)
-  file(MAKE_DIRECTORY ${RANG_INCLUDE_DIR})
-
-  add_library(rang INTERFACE IMPORTED)
-  set_target_properties(rang PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${RANG_INCLUDE_DIR})
-  add_dependencies(rang rang_external)
+  find_package(benchmark REQUIRED)
 
 
   enable_testing()
@@ -125,10 +105,10 @@ if(BUILD_TESTING)
 
   add_executable(benchmark test/benchmark.cxx)
   target_link_libraries(benchmark
-    PRIVATE quadtree ${Boost_LIBRARIES} rang)
+    PRIVATE quadtree ${Boost_LIBRARIES} benchmark::benchmark_main)
 
   add_executable(benchmark2 test/benchmark2.cxx)
   target_include_directories(benchmark2 PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(benchmark2
-    PRIVATE qdtree ${Boost_LIBRARIES} rang foonathan_memory)
+    PRIVATE qdtree ${Boost_LIBRARIES} foonathan_memory benchmark::benchmark_main)
 endif()
