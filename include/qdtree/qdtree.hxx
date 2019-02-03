@@ -612,6 +612,77 @@ QDTree<N, A, Allocator>::clone_node(const node_type& other)
 template <typename N, typename A, typename Allocator>
 void QDTree<N, A, Allocator>::destroy_node(node_type* node)
 {
+  if (node_type::dimension == 1)
+    destroy_node_morris(node);
+  else {
+//    destroy_node_morris_n(node);
+    destroy_node_queue(node);
+  }
+}
+
+
+template <typename N, typename A, typename Allocator>
+void QDTree<N, A, Allocator>::destroy_node_morris(node_type* node)
+{
+  node_type *current = node, *pre;
+
+  while (current != nullptr) {
+    if (current->child(0) == nullptr) {
+      node_type* toDelete = current;
+      current = current->child(1);
+      allocator_traits::destroy(mAllocator, toDelete);
+      allocator_traits::deallocate(mAllocator, toDelete, 1u);
+    } else {
+      // Find the inorder predecessor of current.
+      pre = current->child(0);
+      while (pre->child(1) != nullptr) {
+        pre = pre->child(1);
+      }
+
+      // Make current as right child of its inorder predecessor.
+      node_type* next = current->child(0);
+      pre->setChild(1, current);
+      current->setChild(0, nullptr);
+      current = next;
+    }
+  }
+}
+
+template <typename N, typename A, typename Allocator>
+void QDTree<N, A, Allocator>::destroy_node_morris_n(node_type* node)
+{
+  node_type *current = node, *pre, *lastChild, *toDelete = nullptr;
+
+  while (current != nullptr) {
+    for(size_t i = 0; i < node_type::number_of_children - 1; ++i) {
+      pre = current->child(i);
+      if (pre != nullptr) {
+        if ((lastChild = current->child(node_type::number_of_children - 1)) != nullptr) {
+          // Find the inorder predecessor of current.
+          while (pre->child(node_type::number_of_children - 1) != nullptr) {
+            pre = pre->child(node_type::number_of_children - 1);
+          }
+
+          // Move last child of current as right child of the inorder predecessor of current.
+          pre->setChild(node_type::number_of_children - 1, lastChild);
+        }
+        // Move first node at the end.
+        current->setChild(node_type::number_of_children - 1, current->child(i));
+        current->setChild(i, nullptr);
+      }
+    }
+
+    toDelete = current;
+    current = current->child(node_type::number_of_children - 1);
+    allocator_traits::destroy(mAllocator, toDelete);
+    allocator_traits::deallocate(mAllocator, toDelete, 1u);
+  }
+}
+
+
+template <typename N, typename A, typename Allocator>
+void QDTree<N, A, Allocator>::destroy_node_queue(node_type* node)
+{
   if (node == nullptr)
     return;
 
@@ -631,7 +702,6 @@ void QDTree<N, A, Allocator>::destroy_node(node_type* node)
     allocator_traits::deallocate(mAllocator, node, 1u);
   }
 }
-
 
 template <typename N, typename A, typename Allocator>
 const typename N::data_pointer_type

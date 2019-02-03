@@ -327,6 +327,10 @@ public:
       const coord_type& target,
       coord_value_type radius = std::numeric_limits<coord_value_type>::infinity());
 
+  void destroy_node_queue(node_type* node);
+  void destroy_node_morris(node_type* node);
+  void destroy_node_morris_n(node_type* node);
+
 private:
   void add(const value_type& data, const coord_type &coord);
 };

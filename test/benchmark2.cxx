@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cstdio>
+#include <chrono>
 
 #include <benchmark/benchmark.h>
 
@@ -291,5 +292,128 @@ void bm_single_value(benchmark::State& state)
   }
 }
 BENCHMARK(bm_single_value)->Arg(10)->Arg(25)->Arg(50);
+
+
+template <typename T, typename U>
+struct NumericalAccessor
+{
+  using value_type = U;
+
+  U operator()(const T& v, const size_t) const { return (U)v; }
+};
+
+void bm_1d_deletion_queue(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  qdtree::QDTree<qdtree::SingleNode<1, int>, NumericalAccessor<int, double>> t;
+  t.cover({{0}});
+  t.cover({{double(N)}});
+  for(size_t i = 0; i < N; ++i)
+    t.unsafe_add(i);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    qdtree::SingleNode<1, int>* node = t.clone_node(*t.root());
+    state.ResumeTiming();
+    t.destroy_node_queue(node);
+  }
+}
+BENCHMARK(bm_1d_deletion_queue)->Arg(10)->Arg(100)->Arg(1000)->Arg(10000)->Arg(100000)->Arg(1000000);
+
+void bm_1d_deletion_morris(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  qdtree::QDTree<qdtree::SingleNode<1, int>, NumericalAccessor<int, double>> t;
+  t.cover({{0}});
+  t.cover({{double(N)}});
+  for(size_t i = 0; i < N; ++i)
+    t.unsafe_add(i);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    qdtree::SingleNode<1, int>* node = t.clone_node(*t.root());
+    state.ResumeTiming();
+    t.destroy_node_morris(node);
+  }
+}
+BENCHMARK(bm_1d_deletion_morris)->Arg(10)->Arg(100)->Arg(1000)->Arg(10000)->Arg(100000)->Arg(1000000);
+
+void bm_1d_deletion_morris_n(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  qdtree::QDTree<qdtree::SingleNode<1, int>, NumericalAccessor<int, double>> t;
+  t.cover({{0}});
+  t.cover({{double(N)}});
+  for(size_t i = 0; i < N; ++i)
+    t.unsafe_add(i);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    qdtree::SingleNode<1, int>* node = t.clone_node(*t.root());
+    state.ResumeTiming();
+    t.destroy_node_morris_n(node);
+  }
+}
+BENCHMARK(bm_1d_deletion_morris_n)->Arg(10)->Arg(100)->Arg(1000)->Arg(10000)->Arg(100000)->Arg(1000000);
+
+void bm_2d_deletion_queue(benchmark::State& state)
+{
+  size_t N = state.range(0);
+  auto points = make_points(N);
+
+  VTree t = make_tree<VTree>(N);
+  for(const my::Point& p : points)
+    t.unsafe_add(p);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    VTree::node_type *node = t.clone_node(*t.root());
+    state.ResumeTiming();
+
+    t.destroy_node_queue(node);
+  }
+}
+BENCHMARK(bm_2d_deletion_queue)->Arg(10)->Arg(25)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
+
+void bm_2d_deletion_morris(benchmark::State& state)
+{
+  size_t N = state.range(0);
+  auto points = make_points(N);
+
+  VTree t = make_tree<VTree>(N);
+  for(const my::Point& p : points)
+    t.unsafe_add(p);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+
+    // For some reason, morris destruction might cause the memory manager to loose
+    // its mind (Debian 9, GCC 6.3, Kernel 4.9). Nodes appear to be released in a
+    // more random order, causing the memory to appear fragmented. In each iteration
+    // allocations will take longer and longer
+    // This big allocation makes allocation time constant again.
+    delete[] new int[100000000];
+
+    // Catching the above issue with this benchmark would have been easy if google-benchmark
+    // was able to compute the standard deviation along with the average time.
+    // Until this is possible, running the test again with a longer --benchmark_min_time should
+    // highlight such issue.
+
+    VTree::node_type *node = t.clone_node(*t.root());
+
+    state.ResumeTiming();
+
+    t.destroy_node_morris_n(node);
+  }
+}
+BENCHMARK(bm_2d_deletion_morris)->Arg(10)->Arg(25)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
 
 BENCHMARK_MAIN();

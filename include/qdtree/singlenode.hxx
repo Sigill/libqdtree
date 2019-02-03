@@ -94,7 +94,7 @@ SingleNode<D, T>::pointerToData() {
 
 template <size_t D, typename T>
 std::ostream& operator<<(std::ostream& out, const print_node_data_manip<SingleNode<D, T>>& m) {
-  out << "(" << m.node->data() << ")";
+  out << "(" << *(m.node->data()) << ")";
   return out;
 }
 

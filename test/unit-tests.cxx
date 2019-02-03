@@ -620,3 +620,21 @@ TEST(QDTree, move_op_foo_allocator)
 
   EXPECT_THAT(t, Root(IsNull()));
 }
+
+
+template <typename T, typename U>
+struct NumericalAccessor
+{
+  using value_type = U;
+
+  U operator()(const T& v, const size_t) const { return (U)v; }
+};
+
+TEST(OneDTree, destroy_morris_traversal)
+{
+  qdtree::QDTree<qdtree::SingleNode<1, int>, NumericalAccessor<int, double>> t;
+  for(int i = 0; i < 1000; ++i)
+    t.add(i);
+
+//  std::cout << t << std::endl;
+}

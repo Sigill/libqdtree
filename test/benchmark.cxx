@@ -49,6 +49,27 @@ void bm_add_unsafe(benchmark::State& state)
 }
 BENCHMARK(bm_add_unsafe)->Arg(10);
 
+void bm_destroy(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  for (auto _ : state)
+  {
+    state.PauseTiming();
+    Tree t;
+    t.cover({0.0, 0.0});
+    t.cover({(double)N, (double)N});
+
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        t.unsafe_add({(double)x, (double)y});
+      }
+    }
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(bm_destroy)->Arg(20);
+
 void bm_find_vector(benchmark::State& state)
 {
   size_t N = state.range(0);
