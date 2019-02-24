@@ -624,27 +624,28 @@ void QDTree<N, A, Allocator>::destroy_node(node_type* node)
 template <typename N, typename A, typename Allocator>
 void QDTree<N, A, Allocator>::destroy_node_morris(node_type* node)
 {
-  node_type *current = node, *pre;
+  node_type *current = node, *pre, *pre_candidate, *left, *right;
 
   while (current != nullptr) {
-    if (current->child(0) == nullptr) {
-      node_type* toDelete = current;
-      current = current->child(1);
-      allocator_traits::destroy(mAllocator, toDelete);
-      allocator_traits::deallocate(mAllocator, toDelete, 1u);
-    } else {
-      // Find the inorder predecessor of current.
-      pre = current->child(0);
-      while (pre->child(1) != nullptr) {
-        pre = pre->child(1);
-      }
+    right = current->child(1);
 
-      // Make current as right child of its inorder predecessor.
-      node_type* next = current->child(0);
-      pre->setChild(1, current);
-      current->setChild(0, nullptr);
-      current = next;
+    if ((left = current->child(0)) != nullptr) {
+      if (right != nullptr) {
+        // Find the inorder predecessor of current.
+        pre = left;
+        while ((pre_candidate = pre->child(1)) != nullptr) {
+          pre = pre_candidate;
+        }
+
+        // Move right child of current as right child of the inorder predecessor of current.
+        pre->setChild(1, right);
+        right = left;
+      }
     }
+
+    allocator_traits::destroy(mAllocator, current);
+    allocator_traits::deallocate(mAllocator, current, 1u);
+    current = right;
   }
 }
 
@@ -670,10 +671,9 @@ void QDTree<N, A, Allocator>::destroy_node_morris_n(node_type* node)
           pre->setChild(node_type::number_of_children - 1, lastChild);
         }
 
-        // Move first node at the end.
+        // Move current child at the end.
         lastChild = child;
         current->setChild(node_type::number_of_children - 1, lastChild);
-        current->setChild(i, nullptr);
       }
     }
 
