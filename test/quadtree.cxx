@@ -22,7 +22,4 @@ namespace qdtree {
   template class SingleNode<2, Point>;
   template class QDTree<SingleNode<2, Point>>;
   template std::ostream& operator<<(std::ostream& out, const QDTree<SingleNode<2, Point>>& tree);
-
-  template class VisitorView<SingleNode<2, Point>, double>;
-  template class ConstNearestNeighborVisitor<SingleNode<2, Point>, double>;
 }

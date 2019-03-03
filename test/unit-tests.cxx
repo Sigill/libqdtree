@@ -50,9 +50,9 @@ extent(const std::array<double, 2>& lb, const std::array<double, 2>& ub) {
   return std::make_pair(lb, ub);
 }
 
-template <typename N, typename C>
+template <typename T>
 class TracedNearestNeighborVisitor
-    : public qdtree::ConstNearestNeighborVisitor<N, C>
+    : public qdtree::ConstNearestNeighborVisitor<T>
 {
 public:
   using Base = typename TracedNearestNeighborVisitor::ConstNearestNeighborVisitor;
@@ -507,7 +507,7 @@ TEST(QDTree, find_visitor)
     }
   }
 
-  using V = TracedNearestNeighborVisitor<Tree::node_type, Tree::coord_value_type>;
+  using V = TracedNearestNeighborVisitor<Tree>;
 
   Tree::coord_type target = {3.0, 3.0};
   V visitor(target);

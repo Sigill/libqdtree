@@ -184,7 +184,7 @@ void bm_find_visitor_external_iterator(benchmark::State& state)
   size_t N = state.range(0);
 
   Tree t = build_tree(N);
-  Tree::node_iterator_type it;
+  Tree::const_node_iterator_type it;
 
   for (auto _ : state)
   {
