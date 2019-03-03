@@ -1,5 +1,5 @@
-#ifndef QDTREE_DEF_HXX
-#define QDTREE_DEF_HXX
+#ifndef QDTREE_H
+#define QDTREE_H
 
 #include <list>
 #include <array>
@@ -297,4 +297,4 @@ std::ostream& operator<<(std::ostream& out, const QDTree<N, A, Allocator>& tree)
 
 } // namespace qdtree
 
-#endif // QDTREE_DEF_HXX
+#endif // QDTREE_H
