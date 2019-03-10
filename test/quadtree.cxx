@@ -1,4 +1,4 @@
-#include <iostream>
+#include <ostream>
 
 #include "quadtree.hxx"
 
@@ -21,5 +21,6 @@ namespace qdtree {
   template class Node_Base<2, SingleNode<2, Point>>;
   template class SingleNode<2, Point>;
   template class QDTree<SingleNode<2, Point>>;
-  template std::ostream& operator<<(std::ostream& out, const QDTree<SingleNode<2, Point>>& tree);
+  template class QDTree_Base<SingleNode<2, Point>>;
+  template std::ostream& operator<<(std::ostream& out, const QDTree_Base<SingleNode<2, Point>>& tree);
 }

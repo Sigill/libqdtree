@@ -507,7 +507,7 @@ TEST(QDTree, find_visitor)
     }
   }
 
-  using V = TracedNearestNeighborVisitor<Tree>;
+  using V = TracedNearestNeighborVisitor<Tree::base_type>;
 
   Tree::coord_type target = {3.0, 3.0};
   V visitor(target);

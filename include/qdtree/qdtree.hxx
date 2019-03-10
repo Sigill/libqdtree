@@ -1,91 +1,20 @@
 #ifndef QDTREE_HXX
 #define QDTREE_HXX
 
-#include <iostream>
 #include <algorithm>
 #include <cmath>
-#include <tuple>
 #include <vector>
-#include <memory>
+#include <utility> // std::pair
+#include <array>
+#include <bitset>
 
+#include "qdtree/logging.h"
 #include "qdtree/utils.hxx"
+#include "qdtree/qdtree_base.hxx"
 #include "qdtree/qdtree.h"
 
 namespace qdtree
 {
-
-// Those logging methods are used to print all sort of info related to
-// coordinates, pointers... The only thing that might not be printable out of
-// the box is QDTree::value_type. An operator<< for value_type has to be
-// defined either in value_type's namespace or the qdtree namespace.
-#ifdef HAS_INSTR
-#define LOG(x) std::cout << x << std::flush;
-#define LOGLN(x) LOG(x << "\n")
-#define ILOG(i, x) LOG(indent(i) << x)
-#define ILOGLN(i, x) LOGLN(indent(i) << x)
-
-template <size_t D, typename O, typename U>
-void LOG_NODE_WRAPPED(const Node_Base<D, O>* node,
-                      size_t i,
-                      const std::array<U, D>& a,
-                      const std::array<U, D>& b)
-{
-  LOGLN("Increasing extent toward index " << i << ": " << print_extent(a, b));
-  if (node != nullptr) {
-    LOGLN("Wrapping " << node->child(i) << " as child " << i << " of " << node);
-  }
-}
-#else
-#define LOG(x) (void)(0)
-#define LOGLN(x) LOG(x)
-#define ILOG(i, x) LOG(x)
-#define ILOGLN(i, x) LOG(x)
-
-#define LOG_NODE_WRAPPED(a, b, c, d) (void)(0)
-#endif
-
-template <typename T, typename U>
-U BracketAccessor<T, U>::operator()(const T& v, const size_t i) const
-{
-  return (U)v[i];
-}
-
-template<typename T, size_t D>
-inline std::array<T, D> middle(const std::array<T, D>& lb,
-                               const std::array<T, D>& ub)
-{
-  std::array<T, D> m;
-  for(size_t i = 0; i < D; ++i) {
-    m[i] = (lb[i] + ub[i]) / 2.0;
-  }
-  return m;
-}
-
-template<typename T, size_t D>
-inline void compute_inner_extent(std::array<T, D>& lb,
-                                 std::array<T, D>& ub,
-                                 const std::array<T, D>& center,
-                                 const size_t index)
-{
-  for(size_t i = 0; i < D; ++i) {
-    if (index >> i & 1) {
-      lb[i] = center[i];
-    } else {
-      ub[i] = center[i];
-    }
-  }
-}
-
-template<typename T, size_t D>
-inline std::bitset<D> get_inner_position(const std::array<T, D>& point,
-                                         const std::array<T, D>& ref)
-{
-  std::bitset<D> position;
-  for(size_t i = 0; i < D; ++i) {
-    position.set(i, point[i] >= ref[i]);
-  }
-  return position;
-}
 
 template<typename T, size_t D>
 inline void get_inner_position(const std::array<T, D>& point,
@@ -118,60 +47,35 @@ inline bool is_outside(const std::array<T, D>& c,
   return x;
 }
 
-template <typename T, size_t D>
-inline bool is_outside(const std::array<T, D>& c_lb,
-                       const std::array<T, D>& c_ub,
-                       const std::array<T, D>& lb,
-                       const std::array<T, D>& ub)
-{
-  bool x = false;
-  for(size_t i = 0; i < D; ++i) {
-    x = x || c_lb[i] > ub[i] || c_ub[i] < lb[i];
-  }
-  return x;
-}
-
 
 template <typename N, typename A, typename Allocator>
 QDTree<N, A, Allocator>::QDTree()
 noexcept(std::is_nothrow_default_constructible<allocator_type>::value)
-  : mAllocator()
-  , mCoordinateAccessor()
-  , mLb()
-  , mUb()
-  , mRoot(nullptr)
+  : QDTree_Base<N, A>()
+  , mAllocator()
 {}
 
 template <typename N, typename A, typename Allocator>
 QDTree<N, A, Allocator>::QDTree(const allocator_type& a)
-  : mAllocator(a)
-  , mCoordinateAccessor()
-  , mLb()
-  , mUb()
-  , mRoot(nullptr)
+  : QDTree_Base<N, A>()
+  , mAllocator(a)
 {}
 
 template <typename N, typename A, typename Allocator>
 QDTree<N, A, Allocator>::QDTree(const QDTree& other)
-  : mAllocator(allocator_traits::select_on_container_copy_construction(other.mAllocator))
-  , mCoordinateAccessor(other.mCoordinateAccessor)
-  , mLb(other.mLb)
-  , mUb(other.mUb)
-  , mRoot(nullptr)
+  : QDTree_Base<N, A>(other)
+  , mAllocator(allocator_traits::select_on_container_copy_construction(other.mAllocator))
 {
   if (other.mRoot != nullptr) {
-    mRoot = clone_node(*(other.mRoot));
+    base_type::mRoot = clone_node(*(other.mRoot));
   }
 }
 
 template <typename N, typename A, typename Allocator>
 QDTree<N, A, Allocator>::QDTree(QDTree&& other)
 noexcept(std::is_nothrow_move_constructible<allocator_type>::value)
-  : mAllocator(std::move(other.mAllocator))
-  , mCoordinateAccessor(std::move(other.mCoordinateAccessor))
-  , mLb(std::move(other.mLb))
-  , mUb(std::move(other.mUb))
-  , mRoot(other.mRoot)
+  : QDTree_Base<N, A>(std::move(other))
+  , mAllocator(std::move(other.mAllocator))
 {
   other.mRoot = nullptr;
 }
@@ -179,7 +83,7 @@ noexcept(std::is_nothrow_move_constructible<allocator_type>::value)
 template <typename N, typename A, typename Allocator>
 QDTree<N, A, Allocator>::~QDTree()
 {
-  destroy_node(mRoot);
+  destroy_node(base_type::mRoot);
 }
 
 template <typename N, typename A, typename Allocator>
@@ -188,19 +92,19 @@ QDTree<N, A, Allocator>::operator=(const QDTree& other)
 {
   if (this == &other) return *this;
 
-  mCoordinateAccessor = other.mCoordinateAccessor;
-  mLb = other.mLb;
-  mUb = other.mUb;
+  base_type::mCoordinateAccessor = other.mCoordinateAccessor;
+  base_type::mLb = other.mLb;
+  base_type::mUb = other.mUb;
 
-  destroy_node(mRoot);
+  destroy_node(base_type::mRoot);
 
   if (allocator_traits::propagate_on_container_copy_assignment::value)
     mAllocator = other.mAllocator;
 
   if (other.mRoot == nullptr)
-    mRoot = nullptr;
+    base_type::mRoot = nullptr;
   else
-    mRoot = clone_node(*(other.mRoot));
+    base_type::mRoot = clone_node(*(other.mRoot));
 
   return *this;
 }
@@ -211,21 +115,21 @@ QDTree<N, A, Allocator>::operator=(QDTree&& other) noexcept
 {
   if (this == &other) return *this;
 
-  mCoordinateAccessor = std::move(other.mCoordinateAccessor);
-  mLb                 = std::move(other.mLb);
-  mUb                 = std::move(other.mUb);
+  base_type::mCoordinateAccessor = std::move(other.mCoordinateAccessor);
+  base_type::mLb                 = std::move(other.mLb);
+  base_type::mUb                 = std::move(other.mUb);
 
-  destroy_node(mRoot);
-  mRoot = nullptr;
+  destroy_node(base_type::mRoot);
+  base_type::mRoot = nullptr;
 
   if (allocator_traits::propagate_on_container_move_assignment::value) {
     mAllocator = std::move(other.mAllocator);
-    std::swap(mRoot, other.mRoot);
+    std::swap(base_type::mRoot, other.mRoot);
   } else {
     if (mAllocator == other.mAllocator) {
-      std::swap(mRoot, other.mRoot);
+      std::swap(base_type::mRoot, other.mRoot);
     } else {
-      mRoot = clone_node(*(other.mRoot));
+      base_type::mRoot = clone_node(*(other.mRoot));
     }
   }
 
@@ -233,55 +137,10 @@ QDTree<N, A, Allocator>::operator=(QDTree&& other) noexcept
 }
 
 template <typename N, typename A, typename Allocator>
-inline typename QDTree<N, A, Allocator>::coord_type
-QDTree<N, A, Allocator>::coordinates(const value_type& in) const
-{
-  QDTree::coord_type out;
-  for(size_t i = 0; i < node_type::dimension; ++i)
-    out[i] = mCoordinateAccessor(in, i);
-  return out;
-}
-
-template <typename N, typename A, typename Allocator>
-inline void
-QDTree<N, A, Allocator>::coordinates(
-    const value_type& in,
-    coord_type& out) const
-{
-  for(size_t i = 0; i < node_type::dimension; ++i)
-    out[i] = mCoordinateAccessor(in, i);
-}
-
-template <typename N, typename A, typename Allocator>
-const typename QDTree<N, A, Allocator>::node_type*
-QDTree<N, A, Allocator>::root() const
-{
-  return mRoot;
-}
-
-template <typename N, typename A, typename Allocator>
-inline const typename QDTree<N, A, Allocator>::coord_type&
-QDTree<N, A, Allocator>::lowerBound() const {
-  return mLb;
-}
-
-template <typename N, typename A, typename Allocator>
-inline const typename QDTree<N, A, Allocator>::coord_type&
-QDTree<N, A, Allocator>::upperBound() const {
-  return mUb;
-}
-
-template <typename N, typename A, typename Allocator>
-typename QDTree<N, A, Allocator>::extent_type
-QDTree<N, A, Allocator>::extent() const {
-  return std::make_pair(mLb, mUb);
-}
-
-template <typename N, typename A, typename Allocator>
 void
 QDTree<N, A, Allocator>::cover(const coord_type& p)
 {
-  coord_type a = mLb, b = mUb;
+  coord_type a = base_type::mLb, b = base_type::mUb;
 
   LOGLN("# Covering " << print_coords(p));
 
@@ -296,7 +155,7 @@ QDTree<N, A, Allocator>::cover(const coord_type& p)
     LOGLN("Initializing extent " << print_extent(a, b));
   } else if (is_outside(p, a, b)) {
     // Extend needs to be increased. Double repeatedly to cover.
-    node_type* node = mRoot;
+    node_type* node = base_type::mRoot;
     coord_value_type w = b[0] - a[0];
     std::bitset<node_type::dimension> index;
     for(size_t i = 0; i < node_type::dimension; ++i)
@@ -304,7 +163,7 @@ QDTree<N, A, Allocator>::cover(const coord_type& p)
 
     do {
       // Do not create new nodes if the tree is empty.
-      if (mRoot != nullptr) {
+      if (base_type::mRoot != nullptr) {
         node = allocate_node(index.to_ulong(), node);
       }
 
@@ -318,20 +177,20 @@ QDTree<N, A, Allocator>::cover(const coord_type& p)
       LOG_NODE_WRAPPED(node, index.to_ulong(), a, b);
     } while(is_outside(p, a, b));
 
-    mRoot = node;
+    base_type::mRoot = node;
   } else {
     return;
   }
 
-  mLb = a;
-  mUb = b;
+  base_type::mLb = a;
+  base_type::mUb = b;
 }
 
 template <typename N, typename A, typename Allocator>
 void
 QDTree<N, A, Allocator>::add(const value_type& data)
 {
-  coord_type coord = coordinates(data);
+  coord_type coord = base_type::coordinates(data);
 
   cover(coord);
   add(data, coord);
@@ -341,7 +200,7 @@ template <typename N, typename A, typename Allocator>
 void
 QDTree<N, A, Allocator>::unsafe_add(const value_type& data)
 {
-  coord_type coord = coordinates(data);
+  coord_type coord = base_type::coordinates(data);
 
   add(data, coord);
 }
@@ -355,17 +214,17 @@ QDTree<N, A, Allocator>::add(
   LOGLN("# Adding " << data);
 
   // If the tree is empty, initialize the root as a leaf.
-  if (mRoot == nullptr) {
-    mRoot = allocate_node(data);
-    LOGLN("Creating root node " << mRoot);
-    LOGLN("Inserting " << data << " in " << mRoot);
+  if (base_type::mRoot == nullptr) {
+    base_type::mRoot = allocate_node(data);
+    LOGLN("Creating root node " << base_type::mRoot);
+    LOGLN("Inserting " << data << " in " << base_type::mRoot);
     return;
   }
 
   node_type* parent = nullptr;
-  node_type* node = mRoot;
+  node_type* node = base_type::mRoot;
 
-  coord_type a = mLb, b = mUb;
+  coord_type a = base_type::mLb, b = base_type::mUb;
 
   LOGLN("Visiting [R] " << print_extent(a, b) << " " << node);
 #ifdef HAS_INSTR
@@ -397,14 +256,14 @@ QDTree<N, A, Allocator>::add(
     }
   }
 
-  coord_type other_coord = coordinates(node->oneData());
+  coord_type other_coord = base_type::coordinates(node->oneData());
 
   // Is the new point exactly coincident with the existing point?
   if (other_coord == coord) {
     // TODO replace both cases by node->push(d)?
     if (parent == nullptr) {
       ILOGLN(level, "Duplicating" << data << " in root node");
-      mRoot->insertData(data);
+      base_type::mRoot->insertData(data);
     } else {
       ILOGLN(level, "Duplicating " << data << " in node " << i);
       parent->child(i)->insertData(data);
@@ -418,7 +277,7 @@ QDTree<N, A, Allocator>::add(
   // Otherwise, split the leaf node until the old and new point are separated.
   do {
     if (parent == nullptr) {
-      parent = mRoot = allocate_node();
+      parent = base_type::mRoot = allocate_node();
       LOGLN("Parent is null, creating root node " << parent);
     } else {
       node_type* newParent = allocate_node();
@@ -445,12 +304,12 @@ template <typename N, typename A, typename Allocator>
 void
 QDTree<N, A, Allocator>::remove(const value_type &data) {
   node_type* parent = nullptr;
-  node_type* node = mRoot;
+  node_type* node = base_type::mRoot;
   node_type* retainer = nullptr;
 
-  coord_type coord = coordinates(data);
+  coord_type coord = base_type::coordinates(data);
 
-  coord_type a = mLb, b = mUb;
+  coord_type a = base_type::mLb, b = base_type::mUb;
 
   LOGLN("# Removing " << data);
   LOGLN("Visiting [R] " << print_extent(a, b) << " " << node);
@@ -511,8 +370,8 @@ QDTree<N, A, Allocator>::remove(const value_type &data) {
   // If this is the root point, remove it.
   if (parent == nullptr) {
     ILOGLN(level, "Root node is now empty, removing it");
-    destroy_node(mRoot);
-    mRoot = nullptr;
+    destroy_node(base_type::mRoot);
+    base_type::mRoot = nullptr;
     return;
   }
 
@@ -528,8 +387,8 @@ QDTree<N, A, Allocator>::remove(const value_type &data) {
 
     if (retainer == nullptr) {
       LOGLN("collapsing everything, " << node << " is new root");
-      destroy_node(mRoot);
-      mRoot = node;
+      destroy_node(base_type::mRoot);
+      base_type::mRoot = node;
     } else {
       LOGLN("collapsing " << node << " into " << retainer);
       destroy_node(retainer->removeChild(j));
@@ -706,437 +565,6 @@ void QDTree<N, A, Allocator>::destroy_node_queue(node_type* node)
     allocator_traits::deallocate(mAllocator, node, 1u);
   }
 }
-
-template <typename N, typename A, typename Allocator>
-const typename N::data_pointer_type
-QDTree<N, A, Allocator>::find(
-    const coord_type& target,
-    node_iterator_type& it,
-    coord_value_type radius) const
-{
-  typename node_type::data_pointer_type needle = nullptr;
-
-  if (mRoot == nullptr)
-    return needle;
-
-  coord_type search_lb = lowerBound();
-  coord_type search_ub = upperBound();
-
-  it.clearQueue();
-  it.queue(mRoot, search_lb, search_ub);
-
-  if (std::isfinite(radius)) {
-    for(size_t i = 0; i < node_type::dimension; ++i) {
-      search_lb[i] = target[i] - radius;
-      search_ub[i] = target[i] + radius;
-    }
-    radius *= radius;
-  }
-
-  LOGLN("Search extent: " << print_extent(search_lb, search_ub));
-
-  while(it.loadNext()) {
-    LOGLN("Visiting " << it.node() << ": " << print_extent(it.lb(), it.ub()));
-
-    // Stop searching if this node can't contain a closer data.
-    if (is_outside(it.lb(), it.ub(), search_lb, search_ub)) {
-      LOGLN(print_extent(it.lb(), it.ub()) << " is outside of " << print_extent(search_lb, search_ub));
-      continue;
-    }
-
-    if (!it.isLeaf()) { // Bisect the current node.
-      size_t closest = get_inner_position(target, middle(it.lb(), it.ub())).to_ulong();
-      it.queueChildren(closest);
-    } else { // Visit this point. (Visiting coincident points isn't necessary!)
-      coordinates(it.oneData(), it.coords());
-
-      LOGLN("Visiting point: " << print_coords(it.coords()));
-
-      coord_value_type d2 = 0;
-      for(size_t i = 0; i < node_type::dimension; ++i) {
-        coord_value_type d = it.coords()[i] - target[i];
-        d2 += d*d;
-      }
-
-      if (d2 < radius) {
-        radius = d2;
-        coord_value_type d = std::sqrt(d2);
-        for(size_t i = 0; i < node_type::dimension; ++i) {
-          search_lb[i] = target[i] - d;
-          search_ub[i] = target[i] + d;
-        }
-        LOGLN("Search extent updated: " << print_extent(search_lb, search_ub));
-        needle = it.data();
-      }
-
-      // Cannot find a closer neighbor, skip the rest of the queue.
-      if (d2 <= 0)
-        it.clearQueue();
-    }
-  }
-
-  return needle;
-}
-
-template <typename N, typename A, typename Allocator>
-typename N::data_pointer_type
-QDTree<N, A, Allocator>::find(
-    const coord_type& target,
-    node_iterator_type& it,
-    coord_value_type radius)
-{
-  return const_cast<typename node_type::data_pointer_type>(
-        static_cast<const QDTree&>(*this).find(target, it, radius)
-        );
-}
-
-template <typename N, typename A, typename Allocator>
-const typename N::data_pointer_type
-QDTree<N, A, Allocator>::find(
-    const coord_type& target,
-    coord_value_type radius) const
-{
-  node_iterator_type it(node_type::number_of_children * 8);
-  return find(target, it, radius);
-}
-
-template <typename N, typename A, typename Allocator>
-typename N::data_pointer_type
-QDTree<N, A, Allocator>::find(
-    const coord_type& target,
-    coord_value_type radius)
-{
-  return const_cast<typename node_type::data_pointer_type>(
-        static_cast<const QDTree&>(*this).find(target, radius)
-        );
-}
-
-
-template <typename N, typename A, typename Allocator>
-void
-QDTree<N, A, Allocator>::accept(
-    const_visitor_type *visitor,
-    const_node_iterator_type& iterator) const
-{
-  if (mRoot == nullptr)
-    return;
-
-  iterator.clearQueue();
-
-  iterator.queue(mRoot, lowerBound(), upperBound());
-
-  while(iterator.loadNext()) {
-    LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb(), iterator.ub()));
-
-    if (iterator.isLeaf())
-      coordinates(iterator.oneData(), iterator.coords());
-
-    visitor->visit(iterator);
-  }
-}
-
-template <typename N, typename A, typename Allocator>
-void
-QDTree<N, A, Allocator>::accept(const_visitor_type *visitor) const
-{
-  const_node_iterator_type iterator(node_type::number_of_children * 8);
-  accept(visitor, iterator);
-}
-
-template <typename N, typename A, typename Allocator>
-void
-QDTree<N, A, Allocator>::accept(
-    visitor_type *visitor,
-    node_iterator_type& iterator)
-{
-  if (mRoot == nullptr)
-    return;
-
-  iterator.clearQueue();
-
-  iterator.queue(mRoot, lowerBound(), upperBound());
-
-  while(iterator.loadNext()) {
-    LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb(), iterator.ub()));
-
-    if (iterator.isLeaf())
-      coordinates(iterator.oneData(), iterator.coords());
-
-    visitor->visit(iterator);
-  }
-}
-
-template <typename N, typename A, typename Allocator>
-void
-QDTree<N, A, Allocator>::accept(visitor_type *visitor)
-{
-  node_iterator_type iterator(node_type::number_of_children * 8);
-  accept(visitor, iterator);
-}
-
-
-template <typename N, typename A, typename Allocator>
-const typename N::const_data_pointer_type
-QDTree<N, A, Allocator>::find_visitor(
-    const coord_type& target,
-    const_node_iterator_type& iterator,
-    coord_value_type radius) const
-{
-  ConstNearestNeighborVisitor<QDTree> visitor(target, radius);
-  accept(&visitor, iterator);
-  return visitor.getNearestNeighbor();
-}
-
-template <typename N, typename A, typename Allocator>
-const typename N::const_data_pointer_type
-QDTree<N, A, Allocator>::find_visitor(
-    const coord_type& target,
-    coord_value_type radius) const
-{
-  ConstNearestNeighborVisitor<QDTree> visitor(target, radius);
-  accept(&visitor);
-  return visitor.getNearestNeighbor();
-}
-
-template <typename N, typename A, typename Allocator>
-typename N::data_pointer_type
-QDTree<N, A, Allocator>::find_visitor(
-    const coord_type& target,
-    const_node_iterator_type& iterator,
-    coord_value_type radius)
-{
-  ConstNearestNeighborVisitor<QDTree> visitor(target, radius);
-  accept(&visitor, iterator);
-  return const_cast<typename N::data_pointer_type>(visitor.getNearestNeighbor());
-}
-
-template <typename N, typename A, typename Allocator>
-typename N::data_pointer_type
-QDTree<N, A, Allocator>::find_visitor(
-    const coord_type& target,
-    coord_value_type radius
-    )
-{
-  ConstNearestNeighborVisitor<QDTree> visitor(target, radius);
-  accept(&visitor);
-  return const_cast<typename N::data_pointer_type>(visitor.getNearestNeighbor());
-}
-
-
-
-template <typename T, typename N, typename P>
-inline void
-VisitorView<T, N, P>::queue(node_type* root,
-                         const coord_type& lb,
-                         const coord_type& ub)
-{
-  mQueue.emplace_back(std::make_tuple(root, lb, ub));
-}
-
-template <typename T, typename N, typename P>
-inline void
-VisitorView<T, N, P>::queue(node_type* node,
-                         const coord_type& lb,
-                         const coord_type& ub,
-                         const coord_type& m,
-                         size_t child_index)
-{
-  mQueue.emplace_back(node, lb, ub);
-  auto& b = mQueue.back();
-  compute_inner_extent(std::get<1>(b), std::get<2>(b), m, child_index);
-}
-
-template <typename T, typename N, typename P>
-inline void
-VisitorView<T, N, P>::queueChildren()
-{
-  const coord_type m = middle(mLb, mUb);
-
-  int child_index = node_type::number_of_children - 1;
-  auto child = &(mNode->children().back());
-  while(child_index > 0) {
-    if (*child != nullptr)
-      queue(*child, mLb, mUb, m, child_index);
-
-    --child_index;
-    --child;
-  }
-}
-
-template <typename T, typename N, typename P>
-inline void
-VisitorView<T, N, P>::queueChildren(size_t first)
-{
-  const coord_type m = middle(mLb, mUb);
-
-  int child_index = node_type::number_of_children - 1;
-  auto child = &(mNode->children().back());
-  while(child_index > 0) {
-    if (*child != nullptr && child_index != first)
-      queue(*child, mLb, mUb, m, child_index);
-
-    --child_index;
-    --child;
-  }
-
-  child = &(mNode->children()[first]);
-  if (*child != nullptr) {
-    queue(*child, mLb, mUb, m, first);
-  }
-}
-
-
-template <typename T>
-inline ConstNearestNeighborVisitor<T>::ConstNearestNeighborVisitor(
-    const coord_type& target,
-    coord_value_type radius)
-  : mTarget(target)
-  , mRadius(radius)
-  , mSearchLb()
-  , mSearchUb()
-  , mNearestNeighbor(nullptr)
-{
-  if (std::isfinite(mRadius)) {
-    for(size_t i = 0; i < node_type::dimension; ++i) {
-      mSearchLb[i] = mTarget[i] - mRadius;
-      mSearchUb[i] = mTarget[i] + mRadius;
-    }
-    mRadius *= mRadius;
-  } else {
-    mSearchLb.fill(std::numeric_limits<coord_value_type>::lowest());
-    mSearchUb.fill(std::numeric_limits<coord_value_type>::max());
-  }
-}
-
-template <typename T>
-inline ConstNearestNeighborVisitor<T>::ConstNearestNeighborVisitor(
-    const coord_type& target)
-  : mTarget(target)
-  , mRadius(std::numeric_limits<coord_value_type>::max())
-  , mSearchLb()
-  , mSearchUb()
-  , mNearestNeighbor(nullptr)
-{
-  mSearchLb.fill(std::numeric_limits<coord_value_type>::lowest());
-  mSearchUb.fill(std::numeric_limits<coord_value_type>::max());
-}
-
-template <typename T>
-void ConstNearestNeighborVisitor<T>::visit(view_type& it)
-{
-  // Stop searching if this node can't contain a closer data.
-  if (is_outside(it.lb(), it.ub(), mSearchLb, mSearchUb)) {
-    LOGLN(print_extent(it.lb(), it.ub()) << " is outside of " << print_extent(mSearchLb, mSearchUb));
-    return;
-  }
-
-  if (!it.isLeaf()) { // Bisect the current node.
-    // Visit the closest octant first.
-    size_t closest = get_inner_position(mTarget, middle(it.lb(), it.ub())).to_ulong();
-    it.queueChildren(closest);
-  } else { // Visit this point. (Visiting coincident points isn't necessary!)
-    LOGLN("Visiting point: " << print_coords(it.coords()));
-
-    coord_value_type d2 = 0;
-    for(size_t i = 0; i < node_type::dimension; ++i) {
-      coord_value_type d = it.coords()[i] - mTarget[i];
-      d2 += d*d;
-    }
-
-    if (d2 < mRadius) {
-      mRadius = d2;
-      coord_value_type d = std::sqrt(d2);
-      for(size_t i = 0; i < node_type::dimension; ++i) {
-        mSearchLb[i] = mTarget[i] - d;
-        mSearchUb[i] = mTarget[i] + d;
-      }
-      LOGLN("Search extent updated: " << print_extent(mSearchLb, mSearchUb));
-      mNearestNeighbor = it.data();
-    }
-
-    // Cannot find a closer neighbor, skip the rest of the queue.
-    if (d2 <= 0)
-      it.clearQueue();
-  }
-
-  return;
-}
-
-template <typename T>
-const typename ConstNearestNeighborVisitor<T>::view_type::data_pointer_type
-ConstNearestNeighborVisitor<T>::getNearestNeighbor() const
-{
-  return mNearestNeighbor;
-}
-
-
-template <typename N, typename A, typename Allocator>
-std::ostream&
-operator<<(
-    std::ostream& out,
-    const QDTree<N, A, Allocator>& tree)
-{
-  using Tree = QDTree<N, A, Allocator>;
-
-  std::list<std::tuple<
-      const typename Tree::node_type*,
-      size_t,                          // node index, wrt parent
-      size_t,                          // depth, wrt root
-      typename Tree::coord_type,       // Lower bound of the node
-      typename Tree::coord_type        // Upper bound of the node
-      >> q;
-
-  if (tree.root() != nullptr) {
-    q.push_front(std::make_tuple(tree.root(), 0, 0, tree.lowerBound(), tree.upperBound()));
-  }
-
-  const typename Tree::node_type* node;
-  size_t node_index, level;
-  typename Tree::coord_type node_lb, node_ub;
-
-  while(!q.empty()) {
-    std::tie(node, node_index, level, node_lb, node_ub) = q.front();
-    q.pop_front();
-
-    out << indent(level) << "[";
-    if (level == 0)
-      out << "R";
-    else
-      out << node_index;
-    out << "] " << print_extent(node_lb, node_ub) << " " << node;
-
-    if (node->isLeaf()) {
-      out << " " << print_node_data(node);
-    } else {
-      typename Tree::coord_type child_lb, child_ub;
-      typename Tree::coord_type m = middle(node_lb, node_ub);
-
-      size_t index = Tree::node_type::number_of_children - 1;
-      for(auto it = node->children().crbegin();
-          it != node->children().crend();
-          ++it, --index)
-      {
-        if (*it != nullptr) {
-          child_lb = node_lb; child_ub = node_ub;
-          compute_inner_extent(child_lb, child_ub, m, index);
-          q.push_front(std::make_tuple(*it, index, level + 1, child_lb, child_ub));
-        }
-      }
-    }
-
-    out << "\n";
-  }
-
-  return out;
-}
-
-#undef LOG
-#undef LOGLN
-#undef ILOG
-#undef ILOGLN
-#ifdef HAS_INSTR
-#undef LOG_NODE_WRAPPED
-#endif
 
 } // namespace qdtree
 
