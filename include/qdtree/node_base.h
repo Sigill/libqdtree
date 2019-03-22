@@ -2,6 +2,7 @@
 #define QDTREE_NODE_BASE_H
 
 #include <array>
+#include <functional>
 
 namespace qdtree {
 
@@ -46,6 +47,8 @@ public:
   O* firstChild();
 
   O* lastChild();
+
+  void each_child(std::function<void(size_t, const O*)> f) const;
 
 protected:
   child_list_type mChildren;

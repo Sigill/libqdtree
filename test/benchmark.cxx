@@ -197,6 +197,41 @@ void bm_find_visitor_external_iterator(benchmark::State& state)
     }
   }
 }
-BENCHMARK(bm_find_visitor_external_iterator)->Arg(10)->Arg(25)->Arg(50);
+BENCHMARK(bm_find_visitor_external_iterator)->Arg(10)->Arg(25)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
+
+void bm_frozen_ctor(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  Tree t = build_tree(N);
+  using FrozenTree = qdtree::FrozenQDTree<qdtree::FrozenSingleNode<Tree::node_type::dimension, typename Tree::value_type>>;
+
+  for (auto _ : state)
+  {
+    FrozenTree f(t);
+  }
+}
+BENCHMARK(bm_frozen_ctor)->Arg(10)->Arg(25)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
+
+void bm_frozen_find_visitor_external_iterator(benchmark::State& state)
+{
+  size_t N = state.range(0);
+
+  Tree t = build_tree(N);
+  FrozenTree f(t);
+  FrozenTree::const_node_iterator_type it;
+
+  for (auto _ : state)
+  {
+    for(size_t y = 0; y < N; ++y) {
+      for(size_t x = 0; x < N; ++x) {
+        FrozenTree::coord_type target = {(double)x, (double)y};
+        auto closest = static_cast<const FrozenTree&>(f).find_visitor(target, it);
+        ensure(closest != nullptr && (*closest)[0] == x && (*closest)[1] == y);
+      }
+    }
+  }
+}
+BENCHMARK(bm_frozen_find_visitor_external_iterator)->Arg(10)->Arg(25)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
 
 BENCHMARK_MAIN();

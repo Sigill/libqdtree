@@ -86,6 +86,18 @@ Node_Base<D, O>::lastChild() {
   return nullptr;
 }
 
+template <size_t D, typename O>
+void Node_Base<D, O>::each_child(std::function<void(size_t, const O*)> f) const
+{
+  const O* const * child = &mChildren.front();
+  for(size_t i = 0; i < number_of_children; ++i) {
+    if (*child != nullptr) {
+      f(i, *child);
+    }
+    ++child;
+  }
+}
+
 
 template <typename N>
 print_node_data_manip<N>::print_node_data_manip(const N* node)

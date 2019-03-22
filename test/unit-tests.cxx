@@ -2,6 +2,7 @@
 #include "qdtree/singlenode.hxx"
 #include "qdtree/listnode.hxx"
 #include "qdtree/qdtree.hxx"
+#include "qdtree/frozen_qdtree.hxx"
 #include "matchers.hxx"
 #include <array>
 
@@ -39,6 +40,15 @@ using Allocator = foonathan::memory::std_allocator<
   foonathan::memory::memory_pool<>>;
 
 using Tree = qdtree::QDTree<qdtree::SingleNode<2, Point>, Accessor, Allocator>;
+
+IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
+IMPORT_QDTREE_SINGLENODE_MATCHERS_ALIASES(Tree)
+
+}
+
+namespace FrozenSingleTree {
+
+using Tree = qdtree::FrozenQDTree<qdtree::FrozenSingleNode<2, Point>>;
 
 IMPORT_QDTREE_MATCHERS_ALIASES(Tree)
 IMPORT_QDTREE_SINGLENODE_MATCHERS_ALIASES(Tree)
@@ -90,6 +100,30 @@ inline std::ostream& operator<<(std::ostream& out, const Point& p) {
 }
 
 using namespace ::testing;
+
+TEST(Node_Base, each_child)
+{
+  using node_type = typename SingleTree::Tree::node_type;
+  using Visited = std::vector<std::pair<size_t, const node_type*>>;
+  node_type node;
+
+  auto visit = [&node]() -> Visited {
+    Visited visited;
+    node.each_child([&visited](size_t index, const node_type* child){ visited.emplace_back(index, child); });
+    return visited;
+  };
+
+  ASSERT_THAT(visit(), IsEmpty());
+
+  node.addChild(3, (node_type*)0x4);
+
+  ASSERT_THAT(visit(), ElementsAreArray(Visited({{3ul, (const node_type*)0x4}})));
+
+  node.addChild(0, (node_type*)0x1);
+
+  ASSERT_THAT(visit(), ElementsAreArray(Visited({{0ul, (const node_type*)0x1},
+                                                 {3ul, (const node_type*)0x4}})));
+}
 
 TEST(QDTree, cover_empty)
 {
@@ -635,6 +669,21 @@ TEST(OneDTree, destroy_morris_traversal)
   qdtree::QDTree<qdtree::SingleNode<1, int>, NumericalAccessor<int, double>> t;
   for(int i = 0; i < 1000; ++i)
     t.add(i);
+}
 
-//  std::cout << t << std::endl;
+TEST(FrozenQDTree, ctor)
+{
+  using namespace SingleTree;
+
+  Tree t;
+  t.cover({0.0, 0.0});
+  t.cover({5.0, 5.0});
+
+  for(size_t y = 0; y < 5; ++y) {
+    for(size_t x = 0; x < 5; ++x) {
+      t.add({(double)x, (double)y});
+    }
+  }
+
+  FrozenSingleTree::Tree f(t);
 }

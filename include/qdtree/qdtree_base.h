@@ -186,6 +186,10 @@ public:
     return mUb;
   }
 
+  const accessor_type& accessor() const {
+    return mCoordinateAccessor;
+  }
+
   extent_type extent() const {
     return std::make_pair(mLb, mUb);
   }
