@@ -310,7 +310,7 @@ VisitorView<T, N, P>::queueChildren()
 
   int child_index = node_type::number_of_children - 1;
   auto child = &(mNode->children().back());
-  while(child_index > 0) {
+  while(child_index >= 0) {
     if (*child != nullptr)
       queue(*child, mLb, mUb, m, child_index);
 
@@ -327,7 +327,7 @@ VisitorView<T, N, P>::queueChildren(size_t first)
 
   int child_index = node_type::number_of_children - 1;
   auto child = &(mNode->children().back());
-  while(child_index > 0) {
+  while(child_index >= 0) {
     if (*child != nullptr && child_index != first)
       queue(*child, mLb, mUb, m, child_index);
 
