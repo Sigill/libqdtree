@@ -31,8 +31,6 @@ public:
 
   O* child(size_t i) const;
 
-  bool isLeaf() const;
-
   const child_list_type& children() const;
 
   bool hasSiblings(size_t j) const;

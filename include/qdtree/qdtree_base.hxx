@@ -100,7 +100,7 @@ QDTree_Base<N, A>::find(
       continue;
     }
 
-    if (!it.isLeaf()) { // Bisect the current node.
+    if (!it.hasData()) { // Bisect the current node.
       size_t closest = get_inner_position(target, middle(it.lb(), it.ub())).to_ulong();
       it.queueChildren(closest);
     } else { // Visit this point. (Visiting coincident points isn't necessary!)
@@ -184,7 +184,7 @@ QDTree_Base<N, A>::accept(
   while(iterator.loadNext()) {
     LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb(), iterator.ub()));
 
-    if (iterator.isLeaf())
+    if (iterator.hasData())
       coordinates(iterator.oneData(), iterator.coords());
 
     visitor->visit(iterator);
@@ -215,7 +215,7 @@ QDTree_Base<N, A>::accept(
   while(iterator.loadNext()) {
     LOGLN("Visiting " << iterator.node() << " : " << print_extent(iterator.lb(), iterator.ub()));
 
-    if (iterator.isLeaf())
+    if (iterator.hasData())
       coordinates(iterator.oneData(), iterator.coords());
 
     visitor->visit(iterator);
@@ -386,7 +386,7 @@ void ConstNearestNeighborVisitor<T>::visit(view_type& it)
     return;
   }
 
-  if (!it.isLeaf()) { // Bisect the current node.
+  if (!it.hasData()) { // Bisect the current node.
     // Visit the closest octant first.
     size_t closest = get_inner_position(mTarget, middle(it.lb(), it.ub())).to_ulong();
     it.queueChildren(closest);
@@ -460,7 +460,7 @@ operator<<(
       out << node_index;
     out << "] " << print_extent(node_lb, node_ub) << " " << node;
 
-    if (node->isLeaf()) {
+    if (node->hasData()) {
       out << " " << print_node_data(node);
     } else {
       typename Tree::coord_type child_lb, child_ub;

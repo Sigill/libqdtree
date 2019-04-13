@@ -85,8 +85,8 @@ public:
   const node_type* node() const
   { return mNode; }
 
-  bool isLeaf() const
-  { return mNode->isLeaf(); }
+  bool hasData() const
+  { return mNode->hasData(); }
 
   data_pointer_type data() const
   { return mNode->pointerToData(); }

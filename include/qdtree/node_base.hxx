@@ -3,8 +3,6 @@
 
 #include "node_base.h"
 
-#include <algorithm>
-
 namespace qdtree {
 
 template <size_t D, typename O>
@@ -17,13 +15,6 @@ inline Node_Base<D, O>::Node_Base(size_t i, O* child)
   : mChildren{}
 {
   mChildren[i] = child;
-}
-
-template <size_t D, typename O>
-inline bool Node_Base<D, O>::isLeaf() const {
-  return std::all_of(mChildren.cbegin(),
-                     mChildren.cend(),
-                     [](const O* o){ return o == nullptr; });
 }
 
 template <size_t D, typename O>

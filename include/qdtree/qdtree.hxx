@@ -235,7 +235,7 @@ QDTree<N, A, Allocator>::add(
   size_t i;
 
   // Find the existing leaf for the new point, or add it.
-  while (!node->isLeaf()) {
+  while (!node->hasData()) {
 #ifdef HAS_INSTR
     ++level;
 #endif
@@ -322,7 +322,7 @@ QDTree<N, A, Allocator>::remove(const value_type &data) {
   size_t i, j;
 
   // Find the leaf node for the point.
-  if (!node->isLeaf()) {
+  if (!node->hasData()) {
     while(true) {
       get_inner_position(coord, a, b, middle(a, b), data_index);
       i = data_index.to_ulong();
@@ -340,7 +340,7 @@ QDTree<N, A, Allocator>::remove(const value_type &data) {
         return;
       }
 
-      if (node->isLeaf()) {
+      if (node->hasData()) {
         break;
       }
 
