@@ -20,15 +20,15 @@ inline Node_Base<D, O>::Node_Base(size_t i, O* child)
 }
 
 template <size_t D, typename O>
-inline O* Node_Base<D, O>::child(size_t i) const {
-  return mChildren[i];
-}
-
-template <size_t D, typename O>
 inline bool Node_Base<D, O>::isLeaf() const {
   return std::all_of(mChildren.cbegin(),
                      mChildren.cend(),
                      [](const O* o){ return o == nullptr; });
+}
+
+template <size_t D, typename O>
+inline O* Node_Base<D, O>::child(size_t i) const {
+  return mChildren[i];
 }
 
 template <size_t D, typename O>
@@ -38,8 +38,8 @@ Node_Base<D, O>::children() const {
 }
 
 template <size_t D, typename O>
-inline bool Node_Base<D, O>::has_siblings(size_t j) const {
-  for (size_t i = 0; i < D; ++i) {
+inline bool Node_Base<D, O>::hasSiblings(size_t j) const {
+  for (size_t i = 0; i < mChildren.size(); ++i) {
     if(i != j && mChildren[i] != nullptr) {
       return true;
     }

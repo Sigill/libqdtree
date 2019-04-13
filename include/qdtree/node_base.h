@@ -35,7 +35,7 @@ public:
 
   const child_list_type& children() const;
 
-  bool has_siblings(size_t j) const;
+  bool hasSiblings(size_t j) const;
 
   void addChild(size_t i, O* n);
 

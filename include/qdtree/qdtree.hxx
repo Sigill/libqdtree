@@ -345,7 +345,7 @@ QDTree<N, A, Allocator>::remove(const value_type &data) {
       }
 
       // Retain the deepest parent with a non-removed sibling.
-      if (parent->has_siblings(i)) {
+      if (parent->hasSiblings(i)) {
         retainer = parent;
         j = i;
         ILOGLN(level, "Retaining node " << retainer);
