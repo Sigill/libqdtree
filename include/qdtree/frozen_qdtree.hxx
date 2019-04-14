@@ -183,16 +183,15 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
   node_type* dst;
   const other_node_type* src;
   while(!queue.empty()) {
-    size_t child_index = std::get<2>(queue.back());
-    if (child_index == node_type::number_of_children) {
+    std::tuple<node_type*, const other_node_type*, size_t>& back = queue.back();
+    size_t child_index = std::get<2>(back);
+
+    dst = std::get<0>(back);
+    src = std::get<1>(back);
+
+    if (++std::get<2>(back) == node_type::number_of_children) {
       queue.pop_back();
-      continue;
     }
-
-    dst = std::get<0>(queue.back());
-    src = std::get<1>(queue.back());
-
-    ++std::get<2>(queue.back());
 
     if (src->child(child_index) != nullptr) {
       ++available_nodes;
