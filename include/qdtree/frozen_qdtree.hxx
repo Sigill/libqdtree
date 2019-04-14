@@ -2,6 +2,7 @@
 #define FROZEN_QDTREE_HXX
 
 #include <algorithm>
+#include <tuple>
 
 #include "qdtree/frozen_qdtree.h"
 #include "qdtree/infix_iterator.hxx"
@@ -173,8 +174,8 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
   base_type::mRoot = visitor.nodesCount() > 0 ? new node_type[visitor.nodesCount()]() : nullptr;
   mValues = visitor.valuesCount() > 0 ? new value_type[visitor.valuesCount()]() : nullptr;
 
-  std::vector<std::pair<node_type*, const other_node_type*>> queue;
-  queue.emplace_back(base_type::mRoot, other.root());
+  std::vector<std::tuple<node_type*, const other_node_type*, size_t>> queue;
+  queue.emplace_back(base_type::mRoot, other.root(), 0);
 
   node_type* available_nodes = base_type::mRoot;
   value_type* available_values = mValues;
@@ -182,23 +183,28 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
   node_type* dst;
   const other_node_type* src;
   while(!queue.empty()) {
-    std::tie(dst, src) = queue.back();
-    queue.pop_back();
+    size_t child_index = std::get<2>(queue.back());
+    if (child_index == node_type::number_of_children) {
+      queue.pop_back();
+      continue;
+    }
 
-    if (src->hasData()) {
-      *available_values = *src->data();
-      dst->setData(available_values);
-      ++available_values;
-    } else {
-      size_t child_count = 0;
-      src->each_child([&available_nodes, &dst, &queue, &child_count](size_t index, const other_node_type* srcChild) {
-        ++available_nodes;
-        dst->setChild(index, available_nodes);
-        queue.emplace_back(available_nodes, srcChild);
-        ++child_count;
-      });
-      if (child_count > 0)
-        std::reverse(queue.end() - child_count, queue.end());
+    dst = std::get<0>(queue.back());
+    src = std::get<1>(queue.back());
+
+    ++std::get<2>(queue.back());
+
+    if (src->child(child_index) != nullptr) {
+      ++available_nodes;
+      dst->setChild(child_index, available_nodes);
+
+      if (src->child(child_index)->hasData()) {
+        *available_values = *src->child(child_index)->data();
+        available_nodes->setData(available_values);
+        ++available_values;
+      } else {
+        queue.emplace_back(available_nodes, src->child(child_index), 0);
+      }
     }
   }
 }
