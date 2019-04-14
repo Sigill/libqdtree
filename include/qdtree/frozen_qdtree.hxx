@@ -171,8 +171,13 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
   CounterVisitor<other_tree_type> visitor;
   other.accept(&visitor);
 
-  base_type::mRoot = visitor.nodesCount() > 0 ? new node_type[visitor.nodesCount()]() : nullptr;
-  mValues = visitor.valuesCount() > 0 ? new value_type[visitor.valuesCount()]() : nullptr;
+  base_type::mRoot = visitor.nodesCount() > 0
+      ? new node_type[visitor.nodesCount()]
+      : nullptr;
+  // Skip initialization by only allocating here and using placement new later.
+  mValues = visitor.valuesCount() > 0
+      ? static_cast<value_type*>(::operator new(sizeof(value_type) * visitor.valuesCount()))
+      : nullptr;
 
   std::vector<std::tuple<node_type*, const other_node_type*, size_t>> queue;
   queue.emplace_back(base_type::mRoot, other.root(), 0);
@@ -199,7 +204,7 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
       dst->setChild(child_index, available_nodes);
 
       if (src->child(child_index)->hasData()) {
-        *available_values = *src->child(child_index)->data();
+        new (available_values) value_type(*src->child(child_index)->data());
         available_nodes->setData(available_values);
         ++available_values;
       } else {
