@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <tuple>
+#include <deque>
 
 #include "qdtree/frozen_qdtree.h"
 #include "qdtree/infix_iterator.hxx"
@@ -174,7 +175,7 @@ FrozenQDTree<N, A>::FrozenQDTree(const QDTree_Base<SingleNode<node_type::dimensi
   base_type::mRoot = visitor.nodesCount() > 0 ? new node_type[visitor.nodesCount()]() : nullptr;
   mValues = visitor.valuesCount() > 0 ? new value_type[visitor.valuesCount()]() : nullptr;
 
-  std::vector<std::tuple<node_type*, const other_node_type*, size_t>> queue;
+  std::deque<std::tuple<node_type*, const other_node_type*, size_t>> queue;
   queue.emplace_back(base_type::mRoot, other.root(), 0);
 
   node_type* available_nodes = base_type::mRoot;
